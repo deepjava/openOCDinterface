@@ -16,7 +16,7 @@ import ch.ntb.inf.deep.target.TargetConnectionException;
 
 public class OpenOCD extends TargetConnection {
 
-	private static boolean dbg = false;
+	private static boolean dbg = true;
 
 	final static int SOH = 1;
 	final static int ETX = 3;
@@ -362,104 +362,94 @@ public class OpenOCD extends TargetConnection {
 		}
 	}
 
+	// OK
 	@Override
 	public byte readByte(int address) throws TargetConnectionException {
-		byte[] value = new byte[3];
-		int j = 0, val;
+		byte[] value = new byte[9];
+		int j = 0, val, start=9999;
 
 		try {
-			out.write(("mdb 0x" + Integer.toHexString(address) +	" 1\r\n").getBytes());
+			in.skip(in.available());
+			out.write(("halt" +	" \r\n").getBytes());
+			out.write(("mdb 0x" + Integer.toHexString(address) +	" \r\n").getBytes());
 			while (true) {
 				int n = in.available();
 				if (n <= 0) Thread.sleep(100);
 				int c = in.read();
 				if (c < 0) throw new TargetConnectionException("target not answering");
-				if (dbg) StdStreams.vrb.print((char)c);
-				if (j >= 13 && j <= 14) value[j - 13] = (byte) c;
-				if (j == 14) {val = parseHex(value, 2); break;}
+				if (j >= start) {
+					value[j - start ] = (byte) c;
+//					if (dbg) StdStreams.vrb.print("start: " + (j-start) + " : "+ (char)c + " \r\n");
+				}
+				if ( (char)c == ':' ) start = j+2;
+				if (j == start+1 ) {val = parseHex(value, 2); break;}
 				j++;
 			}
-			if (dbg) StdStreams.vrb.print("val = 0x" + Integer.toHexString(val));
 			if (dbg) StdStreams.vrb.println();
-			waitForPrompt();
 		} catch (Exception e) {
 			throw new TargetConnectionException(e.getMessage(), e);
 		}
-		return (byte) val;
+		return (byte)val;
 	}
 
+	// OK
 	@Override
 	public short readHalfWord(int address) throws TargetConnectionException {
-		byte[] value = new byte[5];
-		int j = 0, val;
+		byte[] value = new byte[9];
+		int j = 0, val, start=9999;
 
 		try {
-			out.write(("mdh 0x" + Integer.toHexString(address) +	" 1\r\n").getBytes());
+			in.skip(in.available());
+			out.write(("halt" +	" \r\n").getBytes());
+			out.write(("mdh 0x" + Integer.toHexString(address) +	" \r\n").getBytes());
 			while (true) {
 				int n = in.available();
 				if (n <= 0) Thread.sleep(100);
 				int c = in.read();
 				if (c < 0) throw new TargetConnectionException("target not answering");
-				if (dbg) StdStreams.vrb.print((char)c);
-				if (j >= 13 && j <= 16) value[j - 13] = (byte) c;
-				if (j == 16) {val = parseHex(value, 4); break;}
+				if (j >= start) {
+					value[j - start ] = (byte) c;
+//					if (dbg) StdStreams.vrb.print("start: " + (j-start) + " : "+ (char)c + " \r\n");
+				}
+				if ( (char)c == ':' ) start = j+2;
+				if (j == start+3 ) {val = parseHex(value, 4); break;}
 				j++;
 			}
 			if (dbg) StdStreams.vrb.println();
-			waitForPrompt();
 		} catch (Exception e) {
 			throw new TargetConnectionException(e.getMessage(), e);
 		}
-		return (short) val;
+		return (short)val;
 	}
 
+	// OK
 	@Override
 	public int readWord(int address) throws TargetConnectionException {
 		byte[] value = new byte[9];
-		int j = 0, val;
+		int j = 0, val, start=9999;
 
 		try {
+			in.skip(in.available());
 			out.write(("halt" +	" \r\n").getBytes());
 			out.write(("mdw 0x" + Integer.toHexString(address) +	" \r\n").getBytes());
 			while (true) {
 				int n = in.available();
 				if (n <= 0) Thread.sleep(100);
-				int c = in.read();										// blockiert und stürzt ab
-				if (c < 0) throw new TargetConnectionException("target not answering");	// wird nie ausgeführt
-				if (dbg) StdStreams.vrb.print((char)c);
-				if (j >= 13 && j <= 21) value[j - 13] = (byte) c;
-				if (j == 21) {val = parseHex(value, 8); break;}
+				int c = in.read();
+				if (c < 0) throw new TargetConnectionException("target not answering");
+				if (j >= start) {
+					value[j - start ] = (byte) c;
+//					if (dbg) StdStreams.vrb.print("start: " + (j-start) + " : "+ (char)c + " \r\n");
+				}
+				if ( (char)c == ':' ) start = j+2;
+				if (j == start+7 ) {val = parseHex(value, 8); break;}
 				j++;
 			}
 			if (dbg) StdStreams.vrb.println();
-			waitForPrompt();
 		} catch (Exception e) {
 			throw new TargetConnectionException(e.getMessage(), e);
 		}
 		return val;
-		
-
-//		byte[] value = new byte[9];
-//		int j = 0, val;
-//
-//		try {
-//			out.write(("md 0x" + Integer.toHexString(address) +	" 1\r\n").getBytes());
-//			while (true) {
-//				int n = in.available();
-//				if (n <= 0) Thread.sleep(100);
-//				int c = in.read();
-//				if (c < 0) throw new TargetConnectionException("target not answering");
-//				if (dbg) StdStreams.vrb.print((char)c);
-//				if (j >= 13 && j <= 21) value[j - 13] = (byte) c;
-//				if (j == 21) {val = parseHex(value, 8); break;}
-//				j++;
-//			}
-//			if (dbg) StdStreams.vrb.println();
-//			waitForPrompt();
-//		} catch (Exception e) {
-//			throw new TargetConnectionException(e.getMessage(), e);
-//		}
-//		return val;
 	}
 
 	@Override
@@ -563,16 +553,16 @@ public class OpenOCD extends TargetConnection {
 	}
 
 	private void waitForPrompt() throws Exception {
-		boolean IACreceived = false, WILLreceived = false;
-		while (true) {
-			int n = in.available();
-			if (n <= 0) Thread.sleep(100);
-			int c = in.read();
-			if (c < 0) throw new TargetConnectionException("target not answering");
-			if (c == IAC) {IACreceived = true; WILLreceived = false;
-			} else if (c == WILL && IACreceived) {WILLreceived = true;
-			} else if (c == SOH && IACreceived && WILLreceived) break;
-		}
+//		boolean IACreceived = false, WILLreceived = false;
+//		while (true) {
+//			int n = in.available();
+//			if (n <= 0) Thread.sleep(100);
+//			int c = in.read();
+//			if (c < 0) throw new TargetConnectionException("target not answering");
+//			if (c == IAC) {IACreceived = true; WILLreceived = false;
+//			} else if (c == WILL && IACreceived) {WILLreceived = true;
+//			} else if (c == SOH && IACreceived && WILLreceived) break;
+//		}
 	}
 	
 	private int parseHex(byte[] hex, int len)  {
