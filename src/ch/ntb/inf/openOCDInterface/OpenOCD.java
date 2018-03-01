@@ -33,6 +33,8 @@ public class OpenOCD extends TargetConnection {
 
 	private OpenOCD() { }
 	
+	
+	//OK
 	public static TargetConnection getInstance() {
 		if (tc != null && !tc.isConnected()) tc = null;
 		if (tc == null) {
@@ -42,116 +44,120 @@ public class OpenOCD extends TargetConnection {
 		return tc;
 	}
 
-	public int readMemory(int address, byte[] buffer, int count) throws Exception {
-		out.write(("mdb 0x" + Integer.toHexString(address) +
-				" " + Integer.toString(count) +
-				"\r\n").getBytes());
-		
-		boolean IACreceived = false;
-		boolean WILLreceived = false;
-		int i = 0;
-		int j = 0;
-		byte value = 0;
-		
-		while (true) {
-			int n = in.available();
-			if (n <= 0) Thread.sleep(100);
-			int c = in.read();
-			byte b = 0;
-			if (c >= 0 && c <= 0xff) b = (byte)c;
-			if (b == IAC) {
-				IACreceived = true;
-				WILLreceived = false;
-			}
-			else if (b == WILL) {
-				if (IACreceived) {
-					WILLreceived = true;
-				}
-			}
-			else if (b == SOH) {
-				if (IACreceived && WILLreceived) {
-//					System.err.println();
-					break;
-				}
-			}
-			
-			if (j == 18) {
-				if (b >= '0' && b <= '9')
-					value = (byte)(b - (byte)'0');
-				else
-					value = 0;
-			}
-			else if (j == 19 || j == 20) {
-				if (b >= '0' && b <= '9') {
-					value *= 10;
-					value += (byte)(b - (byte)'0');
-				}
-			}
-			if (j == 20) {
-				if (i < count) {
-					buffer[i++] = value;
-				}
-			}
-			
-			if (b == '\r' || b == '\n')
-				j = 0;
-			else
-				j++;
-		}
-		
-		return i;
-	}
+//	// not used???
+//	public int readMemory(int address, byte[] buffer, int count) throws Exception {
+//		out.write(("mdb 0x" + Integer.toHexString(address) +
+//				" " + Integer.toString(count) +
+//				"\r\n").getBytes());
+//		
+//		boolean IACreceived = false;
+//		boolean WILLreceived = false;
+//		int i = 0;
+//		int j = 0;
+//		byte value = 0;
+//		
+//		while (true) {
+//			int n = in.available();
+//			if (n <= 0) Thread.sleep(100);
+//			int c = in.read();
+//			byte b = 0;
+//			if (c >= 0 && c <= 0xff) b = (byte)c;
+//			if (b == IAC) {
+//				IACreceived = true;
+//				WILLreceived = false;
+//			}
+//			else if (b == WILL) {
+//				if (IACreceived) {
+//					WILLreceived = true;
+//				}
+//			}
+//			else if (b == SOH) {
+//				if (IACreceived && WILLreceived) {
+////					System.err.println();
+//					break;
+//				}
+//			}
+//			
+//			if (j == 18) {
+//				if (b >= '0' && b <= '9')
+//					value = (byte)(b - (byte)'0');
+//				else
+//					value = 0;
+//			}
+//			else if (j == 19 || j == 20) {
+//				if (b >= '0' && b <= '9') {
+//					value *= 10;
+//					value += (byte)(b - (byte)'0');
+//				}
+//			}
+//			if (j == 20) {
+//				if (i < count) {
+//					buffer[i++] = value;
+//				}
+//			}
+//			
+//			if (b == '\r' || b == '\n')
+//				j = 0;
+//			else
+//				j++;
+//		}
+//		
+//		return i;
+//	}
 	
-	public int readMemory(int address, int[] buffer, int count) throws Exception {
-		boolean IACreceived = false;
-		boolean WILLreceived = false;
-		byte[] value = new byte[9];
-		int i = 0;
-		int j = 0;
-		
-		out.write(("md 0x" + Integer.toHexString(address) +	" " + Integer.toString(count) +	"\r\n").getBytes());
-		while (true) {
-			int n = in.available();
-			if (n <= 0) Thread.sleep(100);
-			int c = in.read();
-			byte b = 0;
-			if (c >= 0 && c <= 0xff) b = (byte)c;
-			if (b == IAC) {
-				IACreceived = true;
-				WILLreceived = false;
-			} else if (b == WILL) {
-				if (IACreceived) WILLreceived = true;
-			} else if (b == SOH) {
-				if (IACreceived && WILLreceived) {
-//					StdStreams.err.println();
-					break;
-				}
-			}
-			if (j >= 13 && j <= 21) value[j - 13] = b;
-			if (j == 21) {
-				if (i < count) {
-					buffer[i++] = parseHex(value, 8);
-				}
-			}
-			if (b == '\r' || b == '\n')	j = 0;
-			else j++;
-		}
-		
-		return i;
-	}
+//	// not used???
+//	public int readMemory(int address, int[] buffer, int count) throws Exception {
+//		boolean IACreceived = false;
+//		boolean WILLreceived = false;
+//		byte[] value = new byte[9];
+//		int i = 0;
+//		int j = 0;
+//		
+//		out.write(("md 0x" + Integer.toHexString(address) +	" " + Integer.toString(count) +	"\r\n").getBytes());
+//		while (true) {
+//			int n = in.available();
+//			if (n <= 0) Thread.sleep(100);
+//			int c = in.read();
+//			byte b = 0;
+//			if (c >= 0 && c <= 0xff) b = (byte)c;
+//			if (b == IAC) {
+//				IACreceived = true;
+//				WILLreceived = false;
+//			} else if (b == WILL) {
+//				if (IACreceived) WILLreceived = true;
+//			} else if (b == SOH) {
+//				if (IACreceived && WILLreceived) {
+////					StdStreams.err.println();
+//					break;
+//				}
+//			}
+//			if (j >= 13 && j <= 21) value[j - 13] = b;
+//			if (j == 21) {
+//				if (i < count) {
+//					buffer[i++] = parseHex(value, 8);
+//				}
+//			}
+//			if (b == '\r' || b == '\n')	j = 0;
+//			else j++;
+//		}
+//		
+//		return i;
+//	}
 	
-	public void writeMemory(int address, int value) throws Exception {
-		writeMemory(address, value, 1);
-	}
+//	// not used???
+//	public void writeMemory(int address, int value) throws Exception {
+//		writeMemory(address, value, 1);
+//	}
 	
-	public void writeMemory(int address, int value, int count) throws Exception {
-		if (count <= 0) throw new Exception("count out of range");
-		out.write(("mm 0x" + Integer.toHexString(address) +
-				" 0x" + Integer.toHexString(value) +
-				" " + Integer.toString(count) +
-				"\r\n").getBytes());
-		waitForPrompt();
-	}
+//	// not used???
+//	public void writeMemory(int address, int value, int count) throws Exception {
+//		if (count <= 0) throw new Exception("count out of range");
+//		out.write(("mm 0x" + Integer.toHexString(address) +
+//				" 0x" + Integer.toHexString(value) +
+//				" " + Integer.toString(count) +
+//				"\r\n").getBytes());
+//		waitForPrompt();
+//	}
 		
 	@Override
 	public void openConnection() throws TargetConnectionException {
@@ -171,7 +177,18 @@ public class OpenOCD extends TargetConnection {
 
 	@Override
 	public void setOptions(HString opts) {
-//		hostname = opts.toString();		//MGE
+		int index = opts.indexOf('_');		// ':' not possible due to parser problem
+		if ( index  == -1 ) {
+//			throw new TargetConnectionException("target not answering");
+			StdStreams.err.println("[TARGET] programmeropts need to be in format 'hostname_port'. I.e. 'localhost_4444");
+		}
+		else {
+			hostname = opts.substring(0, index).toString() ;
+			port = Integer.decode( opts.substring(index+1).toString() );
+			if (dbg) StdStreams.vrb.println("[TARGET] Hostname for Telnet set to " + hostname.toString());
+			if (dbg) StdStreams.vrb.println("[TARGET] Port for Telnet set to " + String.valueOf(port));
+			if (dbg) StdStreams.vrb.println("[TARGET] aaa");
+		}
 	}
 
 	@Override
@@ -197,8 +214,8 @@ public class OpenOCD extends TargetConnection {
 	public int getTargetState() throws TargetConnectionException {
 		boolean IACreceived = false, WILLreceived = false;
 		try {
-			out.write(("info\r\n".getBytes()));
-			if (dbg) StdStreams.vrb.println("[TARGET] send: info");
+			out.write(("mdw 0\r\n".getBytes()));	// try to read memory, warning if target is not halted
+			if (dbg) StdStreams.vrb.println("[TARGET] send: mdw 0");
 		} catch (IOException e) {
 			throw new TargetConnectionException(e.getMessage());
 		}
@@ -224,6 +241,37 @@ public class OpenOCD extends TargetConnection {
 		String mesg = String.valueOf(val);
 		if (mesg.contains("running")) return stateRunning;
 		else return stateDebug;
+		
+
+//		boolean IACreceived = false, WILLreceived = false;
+//		try {
+//			out.write(("info\r\n".getBytes()));
+//			if (dbg) StdStreams.vrb.println("[TARGET] send: info");
+//		} catch (IOException e) {
+//			throw new TargetConnectionException(e.getMessage());
+//		}
+//		char[] val = new char[1024];
+//		int i = 0;
+//		int c = 0;
+//		while (true) {
+//			int n;
+//			try {
+//				n = in.available();
+//				if (n <= 0) Thread.sleep(100);
+//				c = in.read();
+//			} catch (Exception e) {
+//				throw new TargetConnectionException("target connection lost");
+//			}
+//			if (c < 0) throw new TargetConnectionException("target not answering");
+//			if (c == IAC) {IACreceived = true; WILLreceived = false;
+//			} else if (c == WILL && IACreceived) {WILLreceived = true;
+//			} else if (c == SOH && IACreceived && WILLreceived) {if (dbg) StdStreams.vrb.println(); break;}
+//			if (dbg) StdStreams.vrb.print((char)c);
+//			val[i++] = (char) c;
+//		}
+//		String mesg = String.valueOf(val);
+//		if (mesg.contains("running")) return stateRunning;
+//		else return stateDebug;
 	}
 
 	@Override
@@ -376,8 +424,8 @@ public class OpenOCD extends TargetConnection {
 			while (true) {
 				int n = in.available();
 				if (n <= 0) Thread.sleep(100);
-				int c = in.read();
-				if (c < 0) throw new TargetConnectionException("target not answering");
+				int c = in.read();										// blockiert und stürzt ab
+				if (c < 0) throw new TargetConnectionException("target not answering");	// wird nie ausgeführt
 				if (dbg) StdStreams.vrb.print((char)c);
 				if (j >= 13 && j <= 21) value[j - 13] = (byte) c;
 				if (j == 21) {val = parseHex(value, 8); break;}
