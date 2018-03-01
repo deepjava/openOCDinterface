@@ -159,15 +159,16 @@ public class OpenOCD extends TargetConnection {
 //		waitForPrompt();
 //	}
 		
+	// OK
 	@Override
 	public void openConnection() throws TargetConnectionException {
 		try {
 			socket = new Socket(hostname, port);
 			out = socket.getOutputStream();
 			in = socket.getInputStream();
-			waitForPrompt();
-			out.write((("update\r\n").getBytes()));	// reload config file
-			waitForPrompt();
+//			waitForPrompt();
+//			out.write((("update\r\n").getBytes()));	// reload config file
+//			waitForPrompt();
 			if (dbg) StdStreams.vrb.println("[TARGET] Connected ");
 		} catch (Exception e) {
 			if (dbg) StdStreams.vrb.println("[TARGET] Connection failed on " + hostname);
@@ -274,44 +275,43 @@ public class OpenOCD extends TargetConnection {
 //		else return stateDebug;
 	}
 
+	// OK
 	@Override
 	public void startTarget(int address) throws TargetConnectionException {
 		try {
 			if (address != -1) {
-				if (Configuration.getBoard().cpu.arch.name.equals(HString.getHString("arm32"))) {
 					if (dbg) StdStreams.vrb.println("[TARGET] arm: Starting from 0x" + Integer.toHexString(address+0x0000000));
-					out.write((("go " + (address+0x0000000) + "\r\n").getBytes()));
-				} else {
-					if (dbg) StdStreams.vrb.println("[TARGET] ppc: Starting from 0x" + Integer.toHexString(address));
-					out.write((("go " + address + "\r\n").getBytes()));
-				}
+					out.write((("resume " + (address+0x0000000) + "\r\n").getBytes()));
 			} else {
-				if (dbg) StdStreams.vrb.println("[TARGET] Starting");
-				out.write(("go\r\n".getBytes()));
+//				if (dbg) StdStreams.vrb.println("[TARGET] Starting");
+				if (dbg) StdStreams.vrb.println("[TARGET] Resume target");
+				out.write(("resume\r\n".getBytes()));
 			}
-			waitForPrompt();
+//			waitForPrompt();
 		} catch (Exception e) {
 			throw new TargetConnectionException(e.getMessage(), e);
 		}
 	}
 
+	// OK
 	@Override
 	public void stopTarget() throws TargetConnectionException {
 		try {
 			out.write(("halt\r\n".getBytes()));
-			waitForPrompt();
+//			waitForPrompt();
 		} catch (Exception e) {
 			throw new TargetConnectionException(e.getMessage(), e);
 		}
 		if (dbg) StdStreams.vrb.println("[TARGET] stopped");
 	}
 
+	// OK
 	@Override
 	public void resetTarget() throws TargetConnectionException {
 		if (dbg) StdStreams.vrb.println("[TARGET] Reseting");
 		try {
-			out.write(("reset\r\n".getBytes()));
-			waitForPrompt();
+			out.write(("reset halt\r\n".getBytes()));
+//			waitForPrompt();
 		} catch (Exception e) {
 			throw new TargetConnectionException(e.getMessage(), e);
 		}
@@ -492,23 +492,27 @@ public class OpenOCD extends TargetConnection {
 		// not supported here
 	}
 
+	// OK
 	@Override
 	public void downloadImageFile(String filename) throws TargetConnectionException {
 		try {
 			int pos = filename.indexOf("ftp");
-			String name = filename.substring(pos + 4);
+			String name = filename;
 			name = name.replace('\\', '/');
-//			out.write((("halt; load 0x0 " + name + " bin; go 0x100\r\n").getBytes()));
-			if (Configuration.getBoard().cpu.arch.name.equals(HString.getHString("arm32"))) {
-				name = name.replaceAll(".bin", ".InternalRam.bin");
-				out.write((("mmu disable; load 0x0000000 " + name + " bin\r\n").getBytes()));				
-			} else { 
-				name = name.replaceAll(".bin", ".ExternalRam.bin");
-				out.write((("load 0x0 " + name + " bin\r\n").getBytes()));
-			}
+			out.write((("halt\r\n").getBytes()));
+//			out.write((("load_image " + name + " ; resume 0x100\r\n").getBytes()));
+			out.write((("load_image " + name + " \r\n").getBytes()));
+			
+//			if (Configuration.getBoard().cpu.arch.name.equals(HString.getHString("arm32"))) {
+//				name = name.replaceAll(".bin", ".InternalRam.bin");
+//				out.write((("mmu disable; load 0x0000000 " + name + " bin\r\n").getBytes()));				
+//			} else { 
+//				name = name.replaceAll(".bin", ".ExternalRam.bin");
+//				out.write((("load 0x0 " + name + " bin\r\n").getBytes()));
+//			}
 			if (dbg) StdStreams.vrb.println("[TARGET] loading: " + name);
 			StdStreams.log.println(".....");
-			waitForPrompt();
+//			waitForPrompt();
 		} catch (Exception e) {
 			new TargetConnectionException(e.getMessage(), e);
 		}		
