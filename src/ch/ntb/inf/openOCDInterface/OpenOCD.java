@@ -176,6 +176,7 @@ public class OpenOCD extends TargetConnection {
 		}
 	}
 
+	// OK
 	@Override
 	public void setOptions(HString opts) {
 		int index = opts.indexOf('_');		// ':' not possible due to parser problem
@@ -192,6 +193,7 @@ public class OpenOCD extends TargetConnection {
 		}
 	}
 
+	// OK
 	@Override
 	public void closeConnection() {
 		try {
@@ -205,43 +207,53 @@ public class OpenOCD extends TargetConnection {
 		if (dbg) StdStreams.vrb.println("[TARGET] Connection closed");	
 	}
 
+	// OK
 	@Override
 	public boolean isConnected() {
 		if (socket == null) return false;
 		return (socket.isConnected() && !socket.isClosed());
 	}
 	
+	// not tested
 	@Override
 	public int getTargetState() throws TargetConnectionException {
-		boolean IACreceived = false, WILLreceived = false;
+		int j = 0, start=9999;
+		int xPosition = 999;
+		int timeout = 5;		// in sleepcycles of 100 msec
+
 		try {
-			out.write(("mdw 0\r\n".getBytes()));	// try to read memory, warning if target is not halted
-			if (dbg) StdStreams.vrb.println("[TARGET] send: mdw 0");
-		} catch (IOException e) {
-			throw new TargetConnectionException(e.getMessage());
-		}
-		char[] val = new char[1024];
-		int i = 0;
-		int c = 0;
-		while (true) {
-			int n;
-			try {
-				n = in.available();
-				if (n <= 0) Thread.sleep(100);
-				c = in.read();
-			} catch (Exception e) {
-				throw new TargetConnectionException("target connection lost");
+			in.skip(in.available());
+			out.write(("mdb 0x0 \r\n").getBytes());		// try to read memory to check if system is halted
+			while (true) {
+				int n = in.available();
+				if (n <= 0) {
+					Thread.sleep(100);
+					timeout--;
+					if (timeout == 0)	throw new TargetConnectionException("getTargetState() : unexpected answer");
+				}
+				else { 
+					int c = in.read();
+					if (c < 0) 
+						throw new TargetConnectionException("target not answering");
+					
+					if ( (char)c == ':' ) { start = j + 2;  }
+					if (j == start) {
+						if (dbg) StdStreams.vrb.print("char: " + (char)c + " \r\n");
+						if ( (char)c == '0' )	return stateDebug;		// 0x00000000: 00
+						else 					return stateRunning;	// Error: cortex_a_mmu: target not halted
+					}
+					
+					j++;
+				}
 			}
-			if (c < 0) throw new TargetConnectionException("target not answering");
-			if (c == IAC) {IACreceived = true; WILLreceived = false;
-			} else if (c == WILL && IACreceived) {WILLreceived = true;
-			} else if (c == SOH && IACreceived && WILLreceived) {if (dbg) StdStreams.vrb.println(); break;}
-			if (dbg) StdStreams.vrb.print((char)c);
-			val[i++] = (char) c;
+		} catch (Exception e) {
+			throw new TargetConnectionException(e.getMessage(), e);
 		}
-		String mesg = String.valueOf(val);
-		if (mesg.contains("running")) return stateRunning;
-		else return stateDebug;
+	}
+		
+		
+		
+		
 		
 
 //		boolean IACreceived = false, WILLreceived = false;
@@ -273,7 +285,7 @@ public class OpenOCD extends TargetConnection {
 //		String mesg = String.valueOf(val);
 //		if (mesg.contains("running")) return stateRunning;
 //		else return stateDebug;
-	}
+//	}
 
 	// OK
 	@Override
@@ -366,7 +378,9 @@ public class OpenOCD extends TargetConnection {
 	@Override
 	public byte readByte(int address) throws TargetConnectionException {
 		byte[] value = new byte[9];
-		int j = 0, val, start=9999;
+		int j = 0, val, start=999;
+		int xPosition = 999;
+		int timeout = 5;		// in sleepcycles of 100 msec
 
 		try {
 			in.skip(in.available());
@@ -374,16 +388,30 @@ public class OpenOCD extends TargetConnection {
 			out.write(("mdb 0x" + Integer.toHexString(address) +	" \r\n").getBytes());
 			while (true) {
 				int n = in.available();
-				if (n <= 0) Thread.sleep(100);
-				int c = in.read();
-				if (c < 0) throw new TargetConnectionException("target not answering");
-				if (j >= start) {
-					value[j - start ] = (byte) c;
-//					if (dbg) StdStreams.vrb.print("start: " + (j-start) + " : "+ (char)c + " \r\n");
+				if (n <= 0) {
+					Thread.sleep(100);
+					timeout--;
+					if (timeout == 0)	throw new TargetConnectionException("unexpected answer");
 				}
-				if ( (char)c == ':' ) start = j+2;
-				if (j == start+1 ) {val = parseHex(value, 2); break;}
-				j++;
+				else { 
+					int c = in.read();
+					if (c < 0) 
+						throw new TargetConnectionException("target not answering");
+					
+					if ( (char)c == 'x' ) { xPosition = j;  }		// 0x00000104: e4101000
+					if (j == xPosition+9) {
+						if ( (char)c == ':' )	start = xPosition + 11;
+						else					xPosition = 999;
+					}				
+					if (j >= start) {
+						value[j - start ] = (byte) c;
+						if (dbg) StdStreams.vrb.print("start: " + (j-start) + " : "+ (char)c + " \r\n");
+					}
+					
+					if (j == start+1 ) {val = parseHex(value, 2); break;}
+					
+					j++;
+				}
 			}
 			if (dbg) StdStreams.vrb.println();
 		} catch (Exception e) {
@@ -396,7 +424,9 @@ public class OpenOCD extends TargetConnection {
 	@Override
 	public short readHalfWord(int address) throws TargetConnectionException {
 		byte[] value = new byte[9];
-		int j = 0, val, start=9999;
+		int j = 0, val, start=999;
+		int xPosition = 999;
+		int timeout = 5;		// in sleepcycles of 100 msec
 
 		try {
 			in.skip(in.available());
@@ -404,16 +434,30 @@ public class OpenOCD extends TargetConnection {
 			out.write(("mdh 0x" + Integer.toHexString(address) +	" \r\n").getBytes());
 			while (true) {
 				int n = in.available();
-				if (n <= 0) Thread.sleep(100);
-				int c = in.read();
-				if (c < 0) throw new TargetConnectionException("target not answering");
-				if (j >= start) {
-					value[j - start ] = (byte) c;
-//					if (dbg) StdStreams.vrb.print("start: " + (j-start) + " : "+ (char)c + " \r\n");
+				if (n <= 0) {
+					Thread.sleep(100);
+					timeout--;
+					if (timeout == 0)	throw new TargetConnectionException("unexpected answer");
 				}
-				if ( (char)c == ':' ) start = j+2;
-				if (j == start+3 ) {val = parseHex(value, 4); break;}
-				j++;
+				else { 
+					int c = in.read();
+					if (c < 0) 
+						throw new TargetConnectionException("target not answering");
+					
+					if ( (char)c == 'x' ) { xPosition = j;  }		// 0x00000104: e4101000
+					if (j == xPosition+9) {
+						if ( (char)c == ':' )	start = xPosition + 11;
+						else					xPosition = 999;
+					}				
+					if (j >= start) {
+						value[j - start ] = (byte) c;
+						if (dbg) StdStreams.vrb.print("start: " + (j-start) + " : "+ (char)c + " \r\n");
+					}
+					
+					if (j == start+3 ) {val = parseHex(value, 4); break;}
+					
+					j++;
+				}
 			}
 			if (dbg) StdStreams.vrb.println();
 		} catch (Exception e) {
@@ -426,7 +470,9 @@ public class OpenOCD extends TargetConnection {
 	@Override
 	public int readWord(int address) throws TargetConnectionException {
 		byte[] value = new byte[9];
-		int j = 0, val, start=9999;
+		int j = 0, val, start=999;
+		int xPosition = 999;
+		int timeout = 5;		// in sleepcycles of 100 msec
 
 		try {
 			in.skip(in.available());
@@ -434,16 +480,30 @@ public class OpenOCD extends TargetConnection {
 			out.write(("mdw 0x" + Integer.toHexString(address) +	" \r\n").getBytes());
 			while (true) {
 				int n = in.available();
-				if (n <= 0) Thread.sleep(100);
-				int c = in.read();
-				if (c < 0) throw new TargetConnectionException("target not answering");
-				if (j >= start) {
-					value[j - start ] = (byte) c;
-//					if (dbg) StdStreams.vrb.print("start: " + (j-start) + " : "+ (char)c + " \r\n");
+				if (n <= 0) {
+					Thread.sleep(100);
+					timeout--;
+					if (timeout == 0)	throw new TargetConnectionException("unexpected answer");
 				}
-				if ( (char)c == ':' ) start = j+2;
-				if (j == start+7 ) {val = parseHex(value, 8); break;}
-				j++;
+				else { 
+					int c = in.read();
+					if (c < 0) 
+						throw new TargetConnectionException("target not answering");
+					
+					if ( (char)c == 'x' ) { xPosition = j;  }		// 0x00000104: e4101000
+					if (j == xPosition+9) {
+						if ( (char)c == ':' )	start = xPosition + 11;
+						else					xPosition = 999;
+					}				
+					if (j >= start) {
+						value[j - start ] = (byte) c;
+						if (dbg) StdStreams.vrb.print("start: " + (j-start) + " : "+ (char)c + " \r\n");
+					}
+					
+					if (j == start+7 ) {val = parseHex(value, 8); break;}
+					
+					j++;
+				}
 			}
 			if (dbg) StdStreams.vrb.println();
 		} catch (Exception e) {
@@ -451,6 +511,34 @@ public class OpenOCD extends TargetConnection {
 		}
 		return val;
 	}
+
+//	public int readWord(int address) throws TargetConnectionException {
+//		byte[] value = new byte[9];
+//		int j = 0, val, start=9999;
+//
+//		try {
+//			in.skip(in.available());
+//			out.write(("halt" +	" \r\n").getBytes());
+//			out.write(("mdw 0x" + Integer.toHexString(address) +	" \r\n").getBytes());
+//			while (true) {
+//				int n = in.available();
+//				if (n <= 0) Thread.sleep(100);
+//				int c = in.read();
+//				if (c < 0) throw new TargetConnectionException("target not answering");
+//				if (j >= start) {
+//					value[j - start ] = (byte) c;
+//					if (dbg) StdStreams.vrb.print("start: " + (j-start) + " : "+ (char)c + " \r\n");
+//				}
+//				if ( (char)c == ':' ) start = j+2;
+//				if (j == start+7 ) {val = parseHex(value, 8); break;}
+//				j++;
+//			}
+//			if (dbg) StdStreams.vrb.println();
+//		} catch (Exception e) {
+//			throw new TargetConnectionException(e.getMessage(), e);
+//		}
+//		return val;
+//	}
 
 	@Override
 	public void writeByte(int address, byte data)
