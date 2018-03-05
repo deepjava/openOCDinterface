@@ -517,33 +517,43 @@ public class OpenOCD extends TargetConnection {
 //		return val;
 //	}
 
+	// not tested
 	@Override
-	public void writeByte(int address, byte data)
-			throws TargetConnectionException {
-		// TODO Auto-generated method stub
-		
+	public void writeByte(int address, byte data) throws TargetConnectionException {
+		try {
+			if (dbg) StdStreams.vrb.println("[TARGET] writing byte 0x" + Integer.toHexString(data) + " to address 0x" + Integer.toHexString(address) + " (" + address + ")");
+			out.write(("mwb 0x" + Integer.toHexString(address) + " 0x" + Integer.toHexString(data) + "\r\n").getBytes());
+		} catch (Exception e) {
+			throw new TargetConnectionException(e.getMessage(), e);
+		}
 	}
 
+	// not tested
 	@Override
-	public void writeHalfWord(int address, short data)
-			throws TargetConnectionException {
-		// TODO Auto-generated method stub
-		
+	public void writeHalfWord(int address, short data) throws TargetConnectionException {
+		try {
+			if (dbg) StdStreams.vrb.println("[TARGET] writing half word 0x" + Integer.toHexString(data) + " to address 0x" + Integer.toHexString(address) + " (" + address + ")");
+			out.write(("mwh 0x" + Integer.toHexString(address) + " 0x" + Integer.toHexString(data) + "\r\n").getBytes());
+		} catch (Exception e) {
+			throw new TargetConnectionException(e.getMessage(), e);
+		}
 	}
 
+	// OK
 	@Override
 	public void writeWord(int address, int data) throws TargetConnectionException {
 		try {
 			if (dbg) StdStreams.vrb.println("[TARGET] writing word 0x" + Integer.toHexString(data) + " to address 0x" + Integer.toHexString(address) + " (" + address + ")");
-			out.write(("mm 0x" + Integer.toHexString(address) + " 0x" + Integer.toHexString(data) + "\r\n").getBytes());
-			waitForPrompt();
+			out.write(("mww 0x" + Integer.toHexString(address) + " 0x" + Integer.toHexString(data) + "\r\n").getBytes());
+//			waitForPrompt();
 		} catch (Exception e) {
-			e.printStackTrace();
+			throw new TargetConnectionException(e.getMessage(), e);
 		}
 	}
 
 	@Override
 	public void writeTMS(TargetMemorySegment tms) throws TargetConnectionException {
+		StdStreams.err.println("[TARGET] writeTMS(TargetMemorySegment tms) is not supportet with OpenOCD");
 		// not supported here
 	}
 
