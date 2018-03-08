@@ -331,18 +331,25 @@ public class OpenOCD extends TargetConnection {
 	}
 
 	@Override
-	public void setRegisterValue(String regName, long value) {
+	public void setRegisterValue(String regName, long value) throws TargetConnectionException {
 		Register reg = Configuration.getRegisterByName(regName);
 		if (reg != null) setRegisterValue(reg, value);
 	}
 
 	@Override
-	public void setRegisterValue(Register reg, long value) {
-		if (dbg) {
-			if (reg.regType == Parser.sFPR) StdStreams.vrb.println("  Setting register " + reg.name + " to 0x" + Long.toHexString(value));
-			else StdStreams.vrb.println("  Setting register " + reg.name + " to 0x" + Integer.toHexString((int)value));
+	public void setRegisterValue(Register reg, long value) throws TargetConnectionException {
+		try {
+			if (reg.regType == Parser.sFPR) { 
+				//				if (dbg) StdStreams.vrb.println("  Setting register " + reg.name + " to 0x" + Long.toHexString(value));
+				if (dbg) StdStreams.vrb.println("Setting floating point register not yet implemnted");
+			}
+			else {
+				if (dbg) StdStreams.vrb.println("  Setting register " + reg.name + " to 0x" + Integer.toHexString((int)value));
+				out.write(("reg " + reg.address + " 0x" + Integer.toHexString((int)value) + "\r\n").getBytes());
+			}
+		} catch (Exception e) {
+			throw new TargetConnectionException(e.getMessage(), e);
 		}
-
 	}
 
 	@Override
@@ -561,7 +568,7 @@ public class OpenOCD extends TargetConnection {
 	@Override
 	public void downloadImageFile(String filename) throws TargetConnectionException {
 		try {
-			int pos = filename.indexOf("ftp");
+//			int pos = filename.indexOf("ftp");
 			String name = filename;
 			name = name.replace('\\', '/');
 			out.write((("halt\r\n").getBytes()));
@@ -605,40 +612,53 @@ public class OpenOCD extends TargetConnection {
 	
 	private synchronized int getGprValue(int gpr) throws TargetConnectionException {
 		byte[] value = new byte[9];
-		int i = -1, val = 0;
+		int j = 0, val = 0, c;
+		int start=999;
+		int xPosition = 999;
 
 		try {
-			out.write(("rd r" + gpr + "\r\n").getBytes());
-			while (true) {
-				int n = in.available();
-				if (n <= 0) Thread.sleep(100);
-				int c = in.read();
-				if (c < 0) throw new TargetConnectionException("target not answering");
-				if (dbg) StdStreams.vrb.print((char)c);
-				if (i >= 0) value[i++] = (byte) c;
-				if ((char)c == 'x') i = 0;
-				if (i == 8) {val = parseHex(value, 8); break;}
+			in.skip(in.available());
+			out.write(("reg " + gpr + "\r\n").getBytes());			
+
+			while((c = in.read())!=-1) {
+					if (c < 0) 
+						throw new TargetConnectionException("target not answering");
+					
+					if ( (char)c == '(' ) { xPosition = j;  }		// 0x00000100: 04
+					if (j == xPosition+5) {
+						if ( (char)c == ':' )	start = xPosition + 9;
+						else					xPosition = 999;
+					}				
+					if (j >= start && j<= start+7) {
+						value[j - start ] = (byte) c;
+						if (dbg) StdStreams.vrb.print("start: " + (j-start) + " : "+ (char)c + " \r\n");
+					}
+					
+					if (j == start+7 ) {val = parseHex(value, 8); break; }
+					
+					j++;
 			}
+
+			if (dbg) StdStreams.vrb.println("val: " + Integer.toHexString(val));
 			if (dbg) StdStreams.vrb.println();
-			waitForPrompt();
 		} catch (Exception e) {
 			throw new TargetConnectionException(e.getMessage(), e);
 		}
 		return val;
 	}
 
-	private void waitForPrompt() throws Exception {
-//		boolean IACreceived = false, WILLreceived = false;
-//		while (true) {
-//			int n = in.available();
-//			if (n <= 0) Thread.sleep(100);
-//			int c = in.read();
-//			if (c < 0) throw new TargetConnectionException("target not answering");
-//			if (c == IAC) {IACreceived = true; WILLreceived = false;
-//			} else if (c == WILL && IACreceived) {WILLreceived = true;
-//			} else if (c == SOH && IACreceived && WILLreceived) break;
-//		}
-	}
+//	private void waitForPrompt() throws Exception {
+////		boolean IACreceived = false, WILLreceived = false;
+////		while (true) {
+////			int n = in.available();
+////			if (n <= 0) Thread.sleep(100);
+////			int c = in.read();
+////			if (c < 0) throw new TargetConnectionException("target not answering");
+////			if (c == IAC) {IACreceived = true; WILLreceived = false;
+////			} else if (c == WILL && IACreceived) {WILLreceived = true;
+////			} else if (c == SOH && IACreceived && WILLreceived) break;
+////		}
+//	}
 	
 	private int parseHex(byte[] hex, int len)  {
 		int value = 0;
