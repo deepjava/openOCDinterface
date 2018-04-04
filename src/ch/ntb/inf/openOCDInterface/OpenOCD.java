@@ -535,7 +535,7 @@ public class OpenOCD extends TargetConnection {
 		final int memAddrStart = 0x64;
 		final int nofInstr = 1;
 		
-		int instruction = 0xEEE1_0A10;	// VMSR FPSCR, R0
+		int instruction = 0xEEF1_0A10;	// VMRS R0, FPSCR
 		
 		// store r15 (PC)
 		int pcStored = getGprValue(15);
