@@ -187,8 +187,8 @@ public class OpenOCD extends TargetConnection {
 	public void setRegisterValue(Register reg, long value) throws TargetConnectionException {
 		try {
 			if (reg.regType == Parser.sFPR) { 
-				//				if (dbg) StdStreams.vrb.println("[TARGET]   Setting register " + reg.name + " to 0x" + Long.toHexString(value));
-				if (dbg) StdStreams.vrb.println("[TARGET] Setting floating point register not yet implemnted");
+				if (dbg) StdStreams.vrb.println("[TARGET]   Setting register " + reg.name + " to 0x" + Long.toHexString(value));
+				setFprValue(reg.address, value);
 			}
 			else {
 				if (dbg) StdStreams.vrb.println("[TARGET]   Setting register " + reg.name + " to 0x" + Integer.toHexString((int)value));
@@ -517,7 +517,7 @@ public class OpenOCD extends TargetConnection {
 		
 		
 		// remove breakpoint
-		removeBreakPoint(memAddrStart + nofInstr);
+		removeBreakPoint(memAddrStart + nofInstr*4);
 		// restore 1x4 bytes
 		writeWord(memAddrStart, memValue);
 		// restore r0, r1, pc
@@ -565,7 +565,7 @@ public class OpenOCD extends TargetConnection {
 		
 		
 		// remove breakpoint
-		removeBreakPoint(memAddrStart + nofInstr);
+		removeBreakPoint(memAddrStart + nofInstr*4);
 		// restore 1x4 bytes
 		writeWord(memAddrStart, memValue);
 		// restore r0, r1, pc
@@ -575,6 +575,54 @@ public class OpenOCD extends TargetConnection {
 
 		return fpscr;
 	}
+
+	private void setFprValue(int addr, long value) throws TargetConnectionException {
+		final int memAddrStart = 0x64;
+		final int nofInstr = 1;
+		
+		int instruction = 0xEC41_0B10;	// VMOV	D0, R0, R1
+		instruction = instruction | ((addr & 0x10) << 1) | (addr & 0xf);
+		if (dbg) StdStreams.vrb.println("[TARGET] setFprValue instruction: 0x" + Integer.toHexString(instruction));
+		
+		// store r15 (PC)
+		int pcStored = getGprValue(15);
+		// store r0, r1
+		int r0Stored = getGprValue(0);
+		int r1Stored = getGprValue(1);
+		// store 1x4 bytes @ 0x64
+		int memValue = readWord(memAddrStart);
+		
+//		if (dbg) StdStreams.vrb.println("[TARGET] store pc: 0x" + Integer.toHexString(pcStored));
+//		if (dbg) StdStreams.vrb.print(", r0: 0x" + Integer.toHexString(r0Stored));
+//		if (dbg) StdStreams.vrb.print(", r1: 0x" + Integer.toHexString(r1Stored) + "\r\n");
+//		if (dbg) StdStreams.vrb.print("          mem: 0x" + Integer.toHexString(memValue));
+//		if (dbg) StdStreams.vrb.print(", @ 0x" + Integer.toHexString(memAddrStart) + "\r\n");
+		
+		// set r0, r1
+		long r0 = value & 0x0000_ffff;
+		long r1 = (value & 0xffff_0000) >> 32;
+		setRegisterValue("R0", r0);
+		setRegisterValue("R1", r1);
+		
+		// write 1x4 bytes @ 0x64 ("vmov r0, r1, d0")
+		writeWord(memAddrStart, instruction);
+		// set breakpoint to 0x68 (0x64 + nofInstr*4)
+		setBreakPoint(memAddrStart + nofInstr*4);
+		// set PC to 0x64
+		// continue CPU
+		startTarget(memAddrStart);
+		
+		// remove breakpoint
+		removeBreakPoint(memAddrStart + nofInstr*4);
+		// restore 1x4 bytes
+		writeWord(memAddrStart, memValue);
+		// restore r0, r1, pc
+		setRegisterValue("R0", r0Stored);
+		setRegisterValue("R1", r1Stored);
+		setRegisterValue("PC", pcStored);
+		
+	}
+
 
 	private int parseHex(byte[] hex, int len)  {
 		int value = 0;
