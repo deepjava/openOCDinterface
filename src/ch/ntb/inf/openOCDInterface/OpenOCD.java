@@ -645,18 +645,22 @@ public class OpenOCD extends TargetConnection {
 			}
 
 			if (dbg) StdStreams.vrb.println("GPR" + gpr + " val: 0x" + Integer.toHexString(val));
-			if (dbg) StdStreams.vrb.println();
+//			if (dbg) StdStreams.vrb.println();
 		} catch (Exception e) {
 			throw new TargetConnectionException(e.getMessage(), e);
 		}
 		return val;
 	}
 	
-	private synchronized int getFprValue(int fpr) throws TargetConnectionException {
+	private synchronized long getFprValue(int fpr) throws TargetConnectionException {
 		if (dbg) StdStreams.vrb.print("getFprValue (" + fpr + ")\r\n");
 		final int memAddrStart = 0x64;
-		final int nofInstr = 4;
-		final int vmovR0R1D0MachineCode = 0xEC510B10;
+		final int nofInstr = 1;
+//		final int vmovR0R1D0MachineCode = 0xEC510B10;
+		
+		int instruction = 0xEC510B10;	// VMOV	R0, R1, D0
+		instruction = instruction | ((fpr & 0x10) << 1) | (fpr & 0xf);
+		if (dbg) StdStreams.vrb.println("getFprValue instruction: 0x" + Integer.toHexString(instruction));
 		
 		// store r15 (PC)
 		int pcStored = getGprValue(15);
@@ -666,17 +670,17 @@ public class OpenOCD extends TargetConnection {
 		// store 1x4 bytes @ 0x64
 		int memValue = readWord(memAddrStart);
 		
-		if (dbg) StdStreams.vrb.print("store pc: 0x" + Integer.toHexString(pcStored));
-		if (dbg) StdStreams.vrb.print(", r0: 0x" + Integer.toHexString(r0Stored));
-		if (dbg) StdStreams.vrb.print(", r1: 0x" + Integer.toHexString(r1Stored) + "\r\n");
-		if (dbg) StdStreams.vrb.print("          mem: 0x" + Integer.toHexString(memValue));
-		if (dbg) StdStreams.vrb.print(", @ 0x" + Integer.toHexString(memAddrStart) + "\r\n");
+//		if (dbg) StdStreams.vrb.print("store pc: 0x" + Integer.toHexString(pcStored));
+//		if (dbg) StdStreams.vrb.print(", r0: 0x" + Integer.toHexString(r0Stored));
+//		if (dbg) StdStreams.vrb.print(", r1: 0x" + Integer.toHexString(r1Stored) + "\r\n");
+//		if (dbg) StdStreams.vrb.print("          mem: 0x" + Integer.toHexString(memValue));
+//		if (dbg) StdStreams.vrb.print(", @ 0x" + Integer.toHexString(memAddrStart) + "\r\n");
 		
 		
 		// write 1x4 bytes @ 0x64 ("vmov r0, r1, d0")
-		writeWord(memAddrStart, vmovR0R1D0MachineCode);
-		// set breakpoint to 0x68 (0x64 + 1*4)
-		setBreakPoint(memAddrStart + nofInstr);
+		writeWord(memAddrStart, instruction);
+		// set breakpoint to 0x68 (0x64 + nofInstr*4)
+		setBreakPoint(memAddrStart + nofInstr*4);
 		// set PC to 0x64
 		// continue CPU
 		startTarget(memAddrStart);
@@ -685,13 +689,11 @@ public class OpenOCD extends TargetConnection {
 		int r0Float = getGprValue(0);
 		int r1Float = getGprValue(1);
 		// parse r0, r1
+		long fprValue = ((long)r1Float << 32) | ((long)r0Float & 0xffffffffL);
 
-
-		if (dbg) StdStreams.vrb.print("read FPU registers r0: 0x" + Integer.toHexString(r0Float));
-		if (dbg) StdStreams.vrb.print(", r1: 0x" + Integer.toHexString(r1Float) + "\r\n");
-//		if (dbg) StdStreams.vrb.print("FPU register: 0x" + Integer.toHexString(r1Float) + Integer.toHexString(r0Float) + "\r\n");
-//		if (dbg) StdStreams.vrb.print("          mem: 0x" + Integer.toHexString(memValue));
-//		if (dbg) StdStreams.vrb.print(", @ 0x" + Integer.toHexString(memAdrStart) + "\r\n");
+//		if (dbg) StdStreams.vrb.print("read FPU registers r0: 0x" + Integer.toHexString(r0Float));
+//		if (dbg) StdStreams.vrb.print(", r1: 0x" + Integer.toHexString(r1Float) + "\r\n");
+		if (dbg) StdStreams.vrb.print("read FPU registers fprValue: 0x" + Long.toHexString(fprValue));
 		
 		
 		// remove breakpoint
@@ -704,7 +706,8 @@ public class OpenOCD extends TargetConnection {
 		setRegisterValue("PC", pcStored);
 		
 
-		return 0x1111;
+//		return 0x1111;
+		return fprValue;
 		
 		
 //		byte[] value = new byte[9];

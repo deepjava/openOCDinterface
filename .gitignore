@@ -1,1 +1,4 @@
 bin/
+
+openOCD/
+*OpenOCDServer.java
