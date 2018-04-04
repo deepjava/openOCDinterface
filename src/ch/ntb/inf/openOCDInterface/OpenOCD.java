@@ -222,12 +222,13 @@ public class OpenOCD extends TargetConnection {
 //			return getMsrValue();
 //		case Parser.sCR:
 //			return getCrValue();
-//		case Parser.sFPSCR:
-//			return getFpscrValue();
+		case Parser.sFPSCR:
+			return getFpscrValue();
 		default:
 			return defaultValue;
 		}
 	}
+
 
 	// OK
 	@Override
@@ -528,6 +529,53 @@ public class OpenOCD extends TargetConnection {
 		return fprValue;
 	}
 	
+	//not tested
+	private long getFpscrValue() throws TargetConnectionException {
+		if (dbg) StdStreams.vrb.println("[TARGET] getFpscrValue \r\n");
+		final int memAddrStart = 0x64;
+		final int nofInstr = 1;
+		
+		int instruction = 0xEEE1_0A10;	// VMSR FPSCR, R0
+		
+		// store r15 (PC)
+		int pcStored = getGprValue(15);
+		// store r0
+		int r0Stored = getGprValue(0);
+		// store 1x4 bytes @ 0x64
+		int memValue = readWord(memAddrStart);
+		
+//		if (dbg) StdStreams.vrb.println("[TARGET] store pc: 0x" + Integer.toHexString(pcStored));
+//		if (dbg) StdStreams.vrb.print(", r0: 0x" + Integer.toHexString(r0Stored));
+//		if (dbg) StdStreams.vrb.print(", r1: 0x" + Integer.toHexString(r1Stored) + "\r\n");
+//		if (dbg) StdStreams.vrb.print("          mem: 0x" + Integer.toHexString(memValue));
+//		if (dbg) StdStreams.vrb.print(", @ 0x" + Integer.toHexString(memAddrStart) + "\r\n");
+		
+		
+		// write 1x4 bytes @ 0x64 ("vmov r0, r1, d0")
+		writeWord(memAddrStart, instruction);
+		// set breakpoint to 0x68 (0x64 + nofInstr*4)
+		setBreakPoint(memAddrStart + nofInstr*4);
+		// set PC to 0x64
+		// continue CPU
+		startTarget(memAddrStart);
+		
+		// read r0,
+		int fpscr = getGprValue(0);
+		if (dbg) StdStreams.vrb.println("[TARGET] read FPSCR value: 0x" + Long.toHexString(fpscr));
+		
+		
+		// remove breakpoint
+		removeBreakPoint(memAddrStart + nofInstr);
+		// restore 1x4 bytes
+		writeWord(memAddrStart, memValue);
+		// restore r0, r1, pc
+		setRegisterValue("R0", r0Stored);
+		setRegisterValue("PC", pcStored);
+		
+
+		return fpscr;
+	}
+
 	private int parseHex(byte[] hex, int len)  {
 		int value = 0;
 		for (int i = 0; i < len; i++) {
