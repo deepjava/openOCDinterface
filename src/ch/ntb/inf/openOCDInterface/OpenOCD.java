@@ -485,9 +485,8 @@ public class OpenOCD extends TargetConnection {
 		instruction = instruction | ((fpr & 0x10) << 1) | (fpr & 0xf);
 		if (dbg) StdStreams.vrb.println("[TARGET] getFprValue instruction: 0x" + Integer.toHexString(instruction));
 		
-		// store r15 (PC)
+		// store registers
 		int pcStored = getGprValue(15);
-		// store r0, r1
 		int r0Stored = getGprValue(0);
 		int r1Stored = getGprValue(1);
 		// store 1x4 bytes @ 0x64
@@ -523,10 +522,10 @@ public class OpenOCD extends TargetConnection {
 		removeBreakPoint(memAddrStart + nofInstr*4);
 		// restore 1x4 bytes
 		writeWord(memAddrStart, memValue);
-		// restore r0, r1, pc
+		// restore registers
+		setRegisterValue("PC", pcStored);
 		setRegisterValue("R0", r0Stored);
 		setRegisterValue("R1", r1Stored);
-		setRegisterValue("PC", pcStored);
 		
 
 		return fprValue;
@@ -540,9 +539,8 @@ public class OpenOCD extends TargetConnection {
 		
 		int instruction = 0xEEF1_0A10;	// VMRS R0, FPSCR
 		
-		// store r15 (PC)
+		// store registers
 		int pcStored = getGprValue(15);
-		// store r0
 		int r0Stored = getGprValue(0);
 		// store 1x4 bytes @ 0x64
 		int memValue = readWord(memAddrStart);
@@ -571,9 +569,9 @@ public class OpenOCD extends TargetConnection {
 		removeBreakPoint(memAddrStart + nofInstr*4);
 		// restore 1x4 bytes
 		writeWord(memAddrStart, memValue);
-		// restore r0, r1, pc
-		setRegisterValue("R0", r0Stored);
+		// restore registers
 		setRegisterValue("PC", pcStored);
+		setRegisterValue("R0", r0Stored);
 		
 
 		return fpscr;
@@ -587,9 +585,8 @@ public class OpenOCD extends TargetConnection {
 		instruction = instruction | ((addr & 0x10) << 1) | (addr & 0xf);
 		if (dbg) StdStreams.vrb.println("[TARGET] setFprValue instruction: 0x" + Integer.toHexString(instruction));
 		
-		// store r15 (PC)
+		// store registers
 		int pcStored = getGprValue(15);
-		// store r0, r1
 		int r0Stored = getGprValue(0);
 		int r1Stored = getGprValue(1);
 		// store 1x4 bytes @ 0x64
@@ -619,10 +616,10 @@ public class OpenOCD extends TargetConnection {
 		removeBreakPoint(memAddrStart + nofInstr*4);
 		// restore 1x4 bytes
 		writeWord(memAddrStart, memValue);
-		// restore r0, r1, pc
+		// restore registers
+		setRegisterValue("PC", pcStored);
 		setRegisterValue("R0", r0Stored);
 		setRegisterValue("R1", r1Stored);
-		setRegisterValue("PC", pcStored);
 	}
 
 	private void setFpscrValue(long value) throws TargetConnectionException {
@@ -632,9 +629,8 @@ public class OpenOCD extends TargetConnection {
 		int instruction = 0xEEE1_0A10;	// VMSR	FPSCR, R0
 		if (dbg) StdStreams.vrb.println("[TARGET] setFpscrValue instruction: 0x" + Integer.toHexString(instruction));
 		
-		// store r15 (PC)
+		// store registers
 		int pcStored = getGprValue(15);
-		// store r0
 		int r0Stored = getGprValue(0);
 		// store 1x4 bytes @ 0x64
 		int memValue = readWord(memAddrStart);
@@ -660,9 +656,9 @@ public class OpenOCD extends TargetConnection {
 		removeBreakPoint(memAddrStart + nofInstr*4);
 		// restore 1x4 bytes
 		writeWord(memAddrStart, memValue);
-		// restore r0, r1, pc
-		setRegisterValue("R0", r0Stored);
+		// restore registers
 		setRegisterValue("PC", pcStored);
+		setRegisterValue("R0", r0Stored);
 	}
 
 	private int parseHex(byte[] hex, int len)  {
