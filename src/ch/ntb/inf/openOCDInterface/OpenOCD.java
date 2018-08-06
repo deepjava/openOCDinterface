@@ -24,7 +24,7 @@ public class OpenOCD extends TargetConnection {
 //	final static int IAC = 255;
 
 	private static TargetConnection tc;
-	OpenOCDServer oos;
+//	OpenOCDServer oos;
 	String hostname = "localhost";
 	int port = 4444;
 	Socket socket;
@@ -536,8 +536,12 @@ public class OpenOCD extends TargetConnection {
 		if (dbg) StdStreams.vrb.println("[TARGET] getFpscrValue \r\n");
 		final int memAddrStart = 0x64;
 		final int nofInstr = 1;
-		
+
+//		int instruction = 0xEEF0_0A10;	// VMRS R0, FPSID
 		int instruction = 0xEEF1_0A10;	// VMRS R0, FPSCR
+//		int instruction = 0xEEF7_0A10;	// VMRS R0, MVFR0
+//		int instruction = 0xEEF6_0A10;	// VMRS R0, MVFR1
+//		int instruction = 0xEEF8_0A10;	// VMRS R0, FPEXC
 		
 		// store registers
 		int pcStored = getGprValue(15);
