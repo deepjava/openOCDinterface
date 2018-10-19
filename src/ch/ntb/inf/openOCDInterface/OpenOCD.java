@@ -16,7 +16,7 @@ import ch.ntb.inf.deep.target.TargetConnectionException;
 
 public class OpenOCD extends TargetConnection {
 
-	private static boolean dbg = true;
+	private static boolean dbg = false;
 
 //	final static int SOH = 1;
 //	final static int ETX = 3;
@@ -24,7 +24,6 @@ public class OpenOCD extends TargetConnection {
 //	final static int IAC = 255;
 
 	private static TargetConnection tc;
-	OpenOCDServer oos;
 	String hostname = "localhost";
 	int port = 4444;
 	Socket socket;
@@ -32,8 +31,7 @@ public class OpenOCD extends TargetConnection {
 	InputStream in;
 
 	private OpenOCD() {
-		if(dbg) StdStreams.vrb.println("[TARGET] OpenOCD konstruktor");
-//		oos = OpenOCDServer.getInstance();
+		if(dbg) StdStreams.vrb.println("[TARGET] OpenOCD construktor");
 	}
 	
 	
@@ -41,7 +39,7 @@ public class OpenOCD extends TargetConnection {
 	public static TargetConnection getInstance() {
 		if (tc != null && !tc.isConnected()) tc = null;
 		if (tc == null) {
-			if(dbg) StdStreams.vrb.println("[TARGET] AbatronTelnet: Creating new Abatron Telnet");
+			if(dbg) StdStreams.vrb.println("[TARGET] Creating new openOCD");
 			tc = new OpenOCD();
 		}
 		return tc;
@@ -676,6 +674,13 @@ public class OpenOCD extends TargetConnection {
 			}
 		}
 		return value;
+	}
+
+
+	@Override
+	public long[] getRegisterBlock(String block) throws TargetConnectionException {
+		// TODO Auto-generated method stub
+		return null;
 	}
 	
 
