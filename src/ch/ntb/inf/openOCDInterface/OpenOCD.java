@@ -1,6 +1,7 @@
 package ch.ntb.inf.openOCDInterface;
 
 import java.net.Socket;
+import java.util.concurrent.TimeUnit;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -24,6 +25,7 @@ public class OpenOCD extends TargetConnection {
 //	final static int IAC = 255;
 
 	private static TargetConnection tc;
+//	OpenOCDServer oos;
 	String hostname = "localhost";
 	int port = 4444;
 	Socket socket;
@@ -31,7 +33,8 @@ public class OpenOCD extends TargetConnection {
 	InputStream in;
 
 	private OpenOCD() {
-		if(dbg) StdStreams.vrb.println("[TARGET] OpenOCD construktor");
+		if(dbg) StdStreams.vrb.println("[TARGET] OpenOCD konstruktor");
+//		oos = OpenOCDServer.getInstance();
 	}
 	
 	
@@ -39,7 +42,7 @@ public class OpenOCD extends TargetConnection {
 	public static TargetConnection getInstance() {
 		if (tc != null && !tc.isConnected()) tc = null;
 		if (tc == null) {
-			if(dbg) StdStreams.vrb.println("[TARGET] Creating new openOCD");
+			if(dbg) StdStreams.vrb.println("[TARGET] AbatronTelnet: Creating new Abatron Telnet");
 			tc = new OpenOCD();
 		}
 		return tc;
@@ -145,7 +148,7 @@ public class OpenOCD extends TargetConnection {
 				if (dbg) StdStreams.vrb.println("[TARGET] Resume target");
 				out.write(("resume\r\n".getBytes()));
 			}
-//			waitForPrompt();
+			waitForPrompt(2);
 		} catch (Exception e) {
 			throw new TargetConnectionException(e.getMessage(), e);
 		}
@@ -386,28 +389,29 @@ public class OpenOCD extends TargetConnection {
 	@Override
 	public void downloadImageFile(String filename) throws TargetConnectionException {
 		try {
-//			int pos = filename.indexOf("ftp");
+			while (in.available() > 0) in.read();	// empty buffer
 			String name = filename;
 			name = name.replace('\\', '/');
 			out.write((("halt\r\n").getBytes()));
-//			out.write((("load_image " + name + " ; resume 0x100\r\n").getBytes()));
 			out.write((("load_image " + name + " \r\n").getBytes()));
-			
-//			if (Configuration.getBoard().cpu.arch.name.equals(HString.getHString("arm32"))) {
-//				name = name.replaceAll(".bin", ".InternalRam.bin");
-//				out.write((("mmu disable; load 0x0000000 " + name + " bin\r\n").getBytes()));				
-//			} else { 
-//				name = name.replaceAll(".bin", ".ExternalRam.bin");
-//				out.write((("load 0x0 " + name + " bin\r\n").getBytes()));
-//			}
 			if (dbg) StdStreams.vrb.println("[TARGET] loading: " + name);
-			StdStreams.log.println("[TARGET] .....");
-//			waitForPrompt();
+			waitForPrompt(41);
 		} catch (Exception e) {
 			new TargetConnectionException(e.getMessage(), e);
 		}		
 	}
 
+	private void waitForPrompt(int nofNL) throws Exception {
+		while (true) {
+			int n = in.available();
+			if (n <= 0) Thread.sleep(100);
+			int c = in.read();
+			if ((char)c == '\n') nofNL--;
+			if (c < 0) throw new TargetConnectionException("target not answering");
+			if (nofNL == 0) break;
+		}
+	}
+	
 	@Override
 	public void setBreakPoint(int address) throws TargetConnectionException {
 		if (dbg) StdStreams.vrb.println("[TARGET] setting breakpoint @ 0x" + Integer.toHexString(address) + ")\r\n");
@@ -536,7 +540,7 @@ public class OpenOCD extends TargetConnection {
 		final int memAddrStart = 0x64;
 		final int nofInstr = 1;
 		
-		int instruction = 0xEEF1_0A10;	// VMRS R0, FPSCR
+		int instruction = 0xEEF10A10;	// VMRS R0, FPSCR
 		
 		// store r15 (PC)
 		int pcStored = getGprValue(15);
@@ -581,7 +585,7 @@ public class OpenOCD extends TargetConnection {
 		final int memAddrStart = 0x64;
 		final int nofInstr = 1;
 		
-		int instruction = 0xEC41_0B10;	// VMOV	D0, R0, R1
+		int instruction = 0xEC410B10;	// VMOV	D0, R0, R1
 		instruction = instruction | ((addr & 0x10) << 1) | (addr & 0xf);
 		if (dbg) StdStreams.vrb.println("[TARGET] setFprValue instruction: 0x" + Integer.toHexString(instruction));
 		
@@ -600,8 +604,8 @@ public class OpenOCD extends TargetConnection {
 //		if (dbg) StdStreams.vrb.print(", @ 0x" + Integer.toHexString(memAddrStart) + "\r\n");
 		
 		// set r0, r1
-		long r0 = value & 0x0000_ffff;
-		long r1 = (value & 0xffff_0000) >> 32;
+		long r0 = value & 0x0000ffff;
+		long r1 = (value & 0xffff0000) >> 32;
 		setRegisterValue("R0", r0);
 		setRegisterValue("R1", r1);
 		
@@ -627,7 +631,7 @@ public class OpenOCD extends TargetConnection {
 		final int memAddrStart = 0x64;
 		final int nofInstr = 1;
 		
-		int instruction = 0xEEE1_0A10;	// VMSR	FPSCR, R0
+		int instruction = 0xEEE10A10;	// VMSR	FPSCR, R0
 		if (dbg) StdStreams.vrb.println("[TARGET] setFpscrValue instruction: 0x" + Integer.toHexString(instruction));
 		
 		// store r15 (PC)
