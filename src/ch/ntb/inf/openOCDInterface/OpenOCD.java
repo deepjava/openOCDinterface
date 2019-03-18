@@ -19,11 +19,6 @@ public class OpenOCD extends TargetConnection {
 
 	private static boolean dbg = false;
 
-//	final static int SOH = 1;
-//	final static int ETX = 3;
-//	final static int WILL = 251;
-//	final static int IAC = 255;
-
 	private static TargetConnection tc;
 //	OpenOCDServer oos;
 	String hostname = "localhost";
@@ -99,12 +94,10 @@ public class OpenOCD extends TargetConnection {
 		return (socket.isConnected() && !socket.isClosed());
 	}
 	
-	// OK
 	@Override
 	public int getTargetState() throws TargetConnectionException {
-		int j = 0, start=9999;
+		int j = 0, start = 9999;
 		int timeout = 5;		// in sleepcycles of 100 msec
-
 		try {
 			in.skip(in.available());
 			out.write(("mdb 0x0 \r\n").getBytes());		// try to read memory to check if system is halted
@@ -113,20 +106,16 @@ public class OpenOCD extends TargetConnection {
 				if (n <= 0) {
 					Thread.sleep(100);
 					timeout--;
-					if (timeout == 0)	throw new TargetConnectionException("getTargetState() : unexpected answer");
-				}
-				else { 
+					if (timeout == 0) throw new TargetConnectionException("getTargetState() : unexpected answer");
+				} else { 
 					int c = in.read();
-					if (c < 0) 
-						throw new TargetConnectionException("target not answering");
-					
-					if ( (char)c == ':' ) { start = j + 2;  }
+					if (c < 0) throw new TargetConnectionException("target not answering");				
+					if ((char)c == ':') start = j + 2;
 					if (j == start) {
 						if (dbg) StdStreams.vrb.println("[TARGET] getTargetState() char: " + (char)c + " \r\n");
-						if ( (char)c == '0' )	return stateDebug;		// 0x00000000: 00
-						else 					return stateRunning;	// Error: cortex_a_mmu: target not halted
+						if ((char)c == '0')	return stateDebug;		// 0x00000000: 00
+						else return stateRunning;	// Error: cortex_a_mmu: target not halted
 					}
-					
 					j++;
 				}
 			}
@@ -135,8 +124,6 @@ public class OpenOCD extends TargetConnection {
 		}
 	}
 
-
-	// "resume at address" not tested
 	@Override
 	public void startTarget(int address) throws TargetConnectionException {
 		try {
@@ -148,7 +135,7 @@ public class OpenOCD extends TargetConnection {
 				if (dbg) StdStreams.vrb.println("[TARGET] Resume target");
 				out.write(("resume\r\n".getBytes()));
 			}
-			waitForPrompt(2);
+			waitForNL(2);
 		} catch (Exception e) {
 			throw new TargetConnectionException(e.getMessage(), e);
 		}
@@ -385,7 +372,6 @@ public class OpenOCD extends TargetConnection {
 		// not supported here
 	}
 
-	// OK
 	@Override
 	public void downloadImageFile(String filename) throws TargetConnectionException {
 		try {
@@ -395,17 +381,29 @@ public class OpenOCD extends TargetConnection {
 			out.write((("halt\r\n").getBytes()));
 			out.write((("load_image " + name + " \r\n").getBytes()));
 			if (dbg) StdStreams.vrb.println("[TARGET] loading: " + name);
-			waitForPrompt(41);
+			StringBuffer buf = new StringBuffer();
+			while (true) {
+				int n = in.available();
+				if (n <= 0) Thread.sleep(100);
+				int c = in.read();
+				if (c < 0) throw new TargetConnectionException("target not answering");
+				buf.append((char)c);
+				if (buf.indexOf("downloaded") > 0) {
+					waitForNL(1);
+					break;
+				}
+			}
 		} catch (Exception e) {
-			new TargetConnectionException(e.getMessage(), e);
+			throw new TargetConnectionException(e.getMessage(), e);
 		}		
 	}
 
-	private void waitForPrompt(int nofNL) throws Exception {
+	private void waitForNL(int nofNL) throws Exception {
 		while (true) {
 			int n = in.available();
 			if (n <= 0) Thread.sleep(100);
 			int c = in.read();
+//			StdStreams.vrb.println((char)c);
 			if ((char)c == '\n') nofNL--;
 			if (c < 0) throw new TargetConnectionException("target not answering");
 			if (nofNL == 0) break;
