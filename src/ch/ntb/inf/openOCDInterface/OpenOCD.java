@@ -135,7 +135,7 @@ public class OpenOCD extends TargetConnection {
 				if (dbg) StdStreams.vrb.println("[TARGET] Resume target");
 				out.write(("resume\r\n".getBytes()));
 			}
-			waitForNL(2);
+			waitForNL(1);
 		} catch (Exception e) {
 			throw new TargetConnectionException(e.getMessage(), e);
 		}
@@ -181,6 +181,9 @@ public class OpenOCD extends TargetConnection {
 				break;
 			case Parser.sFPSCR:
 				setFpscrValue(value);
+				break;
+			case Parser.sIOR:
+				writeWord(reg.address, (int)value);
 				break;
 			default:
 				out.write(("reg " + reg.address + " 0x" + Integer.toHexString((int)value) + "\r\n").getBytes());
