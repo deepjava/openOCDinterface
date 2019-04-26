@@ -96,11 +96,11 @@ public class OpenOCD extends TargetConnection {
 	
 	@Override
 	public int getTargetState() throws TargetConnectionException {
-		int j = 0, start = 9999;
 		int timeout = 5;		// in sleepcycles of 100 msec
 		try {
 			in.skip(in.available());
-			out.write(("mdb 0x0 \r\n").getBytes());		// try to read memory to check if system is halted
+			out.write(("reg 0 \r\n").getBytes());		// try to read register to check if system is halted
+			boolean state = false;
 			while (true) {
 				int n = in.available();
 				if (n <= 0) {
@@ -109,14 +109,9 @@ public class OpenOCD extends TargetConnection {
 					if (timeout == 0) throw new TargetConnectionException("getTargetState() : unexpected answer");
 				} else { 
 					int c = in.read();
-					if (c < 0) throw new TargetConnectionException("target not answering");				
-					if ((char)c == ':') start = j + 2;
-					if (j == start) {
-						if (dbg) StdStreams.vrb.println("[TARGET] getTargetState() char: " + (char)c + " \r\n");
-						if ((char)c == '0')	return stateDebug;		// 0x00000000: 00
-						else return stateRunning;	// Error: cortex_a_mmu: target not halted
-					}
-					j++;
+					if (c < 0) throw new TargetConnectionException("target not answering");	
+					if ((char)c == 'T')	state = true;		// "Target not halted"
+					if ((char)c == ':') return state? stateRunning: stateDebug;
 				}
 			}
 		} catch (Exception e) {
