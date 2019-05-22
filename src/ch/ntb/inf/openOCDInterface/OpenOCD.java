@@ -1,7 +1,6 @@
 package ch.ntb.inf.openOCDInterface;
 
 import java.net.Socket;
-import java.util.concurrent.TimeUnit;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -18,32 +17,24 @@ import ch.ntb.inf.deep.target.TargetConnectionException;
 public class OpenOCD extends TargetConnection {
 
 	private static boolean dbg = false;
-
 	private static TargetConnection tc;
-//	OpenOCDServer oos;
-	String hostname = "localhost";
-	int port = 4444;
-	Socket socket;
-	OutputStream out;
-	InputStream in;
+	private String hostname;
+	private int port;
+	private Socket socket;
+	private OutputStream out;
+	private InputStream in;
 
-	private OpenOCD() {
-		if(dbg) StdStreams.vrb.println("[TARGET] OpenOCD konstruktor");
-//		oos = OpenOCDServer.getInstance();
-	}
+	private OpenOCD() {	}
 	
-	
-	//OK
 	public static TargetConnection getInstance() {
 		if (tc != null && !tc.isConnected()) tc = null;
 		if (tc == null) {
-			if(dbg) StdStreams.vrb.println("[TARGET] AbatronTelnet: Creating new Abatron Telnet");
+			if (dbg) StdStreams.vrb.println("[TARGET] OpenOCD: Creating new OpenOCD Telnet");
 			tc = new OpenOCD();
 		}
 		return tc;
 	}
 		
-	// OK
 	@Override
 	public void openConnection() throws TargetConnectionException {
 		try {
@@ -57,15 +48,12 @@ public class OpenOCD extends TargetConnection {
 		}
 	}
 
-	// OK
 	@Override
 	public void setOptions(HString opts) {
-		int index = opts.indexOf('_');		// ':' not possible due to parser problem
-		if ( index  == -1 ) {
-//			throw new TargetConnectionException("target not answering");
+		int index = opts.indexOf('_');
+		if (index  == -1) {
 			StdStreams.err.println("[TARGET] programmeropts need to be in format 'hostname_port'. I.e. 'localhost_4444");
-		}
-		else {
+		} else {
 			hostname = opts.substring(0, index).toString() ;
 			port = Integer.decode( opts.substring(index+1).toString() );
 			if (dbg) StdStreams.vrb.println("[TARGET] Hostname for Telnet set to : " + hostname.toString());
@@ -73,7 +61,6 @@ public class OpenOCD extends TargetConnection {
 		}
 	}
 
-	// OK
 	@Override
 	public void closeConnection() {
 		try {
@@ -87,7 +74,6 @@ public class OpenOCD extends TargetConnection {
 		if (dbg) StdStreams.vrb.println("[TARGET] Connection closed");	
 	}
 
-	// OK
 	@Override
 	public boolean isConnected() {
 		if (socket == null) return false;
@@ -123,8 +109,7 @@ public class OpenOCD extends TargetConnection {
 	public void startTarget(int address) throws TargetConnectionException {
 		try {
 			if (address != -1) {
-					if (dbg) StdStreams.vrb.println("[TARGET] arm: Starting from 0x" + Integer.toHexString(address+0x0000000));
-//					out.write((("resume " + (address+0x0000000) + "\r\n").getBytes()));
+					if (dbg) StdStreams.vrb.println("[TARGET] arm: Starting from 0x" + Integer.toHexString(address));
 					out.write((("resume " + address + "\r\n").getBytes()));
 			} else {
 				if (dbg) StdStreams.vrb.println("[TARGET] Resume target");
@@ -136,25 +121,21 @@ public class OpenOCD extends TargetConnection {
 		}
 	}
 
-	// OK
 	@Override
 	public void stopTarget() throws TargetConnectionException {
 		try {
 			out.write(("halt\r\n".getBytes()));
-//			waitForPrompt();
 		} catch (Exception e) {
 			throw new TargetConnectionException(e.getMessage(), e);
 		}
 		if (dbg) StdStreams.vrb.println("[TARGET] stopped");
 	}
 
-	// OK
 	@Override
 	public void resetTarget() throws TargetConnectionException {
 		if (dbg) StdStreams.vrb.println("[TARGET] Reseting");
 		try {
 			out.write(("reset halt\r\n".getBytes()));
-//			waitForPrompt();
 		} catch (Exception e) {
 			throw new TargetConnectionException(e.getMessage(), e);
 		}
@@ -177,10 +158,10 @@ public class OpenOCD extends TargetConnection {
 			case Parser.sFPSCR:
 				setFpscrValue(value);
 				break;
-			case Parser.sIOR:
+			case Parser.sIOR:	// is used solely by launcher not by target operation view
 				writeWord(reg.address, (int)value);
 				break;
-			default:
+			default:	// sGPR
 				out.write(("reg " + reg.address + " 0x" + Integer.toHexString((int)value) + "\r\n").getBytes());
 			}
 		} catch (Exception e) {
@@ -197,20 +178,14 @@ public class OpenOCD extends TargetConnection {
 
 	@Override
 	public long getRegisterValue(Register reg) throws TargetConnectionException {
-		if (dbg) StdStreams.vrb.println("[TARGET] read from register " + reg.name);
-		switch(reg.regType) {
+		if (dbg) StdStreams.vrb.println("\r\n[TARGET] read from register " + reg.name);
+		switch (reg.regType) {
 		case Parser.sGPR:
 			return getGprValue(reg.address);
 		case Parser.sFPR:
 			return getFprValue(reg.address);
-//		case Parser.sSPR:
+//		case Parser.sCPR:
 //			return getSprValue(reg.address);
-//		case Parser.sIOR:
-//			return getIorValue(reg.address);
-//		case Parser.sMSR:
-//			return getMsrValue();
-//		case Parser.sCR:
-//			return getCrValue();
 		case Parser.sFPSCR:
 			return getFpscrValue();
 		default:
@@ -218,119 +193,29 @@ public class OpenOCD extends TargetConnection {
 		}
 	}
 
-
-	// OK
+	@Override
+	public long[] getRegisterBlock(String block) throws TargetConnectionException {
+		return null;
+	}
+	
 	@Override
 	public byte readByte(int address) throws TargetConnectionException {
-		byte[] value = new byte[9];
-		int j = 0, val = 0, start=999;
-		int xPosition = 999;
-
-		try {
-			in.skip(in.available());
-			out.write(("mdb 0x" + Integer.toHexString(address) +	" \r\n").getBytes());
-			
-			int c;
-			while((c = in.read())!=-1) {
-					if (c < 0) 
-						throw new TargetConnectionException("target not answering");
-					
-					if ( (char)c == 'x' ) { xPosition = j;  }		// 0x00000100: 04
-					if (j == xPosition+9) {
-						if ( (char)c == ':' )	start = xPosition + 11;
-						else					xPosition = 999;
-					}				
-					if (j >= start) {
-						value[j - start ] = (byte) c;
-//						if (dbg) StdStreams.vrb.println("[TARGET] start: " + (j-start) + " : "+ (char)c + " \r\n");
-					}
-					
-					if (j == start+1 ) {val = parseHex(value, 2); break;}
-					
-					j++;
-			}
-			if (dbg) StdStreams.vrb.println();		
-		} catch (Exception e) {
-			throw new TargetConnectionException(e.getMessage(), e);
-		}
-		return (byte)val;
+		byte[] cmd = ("mdb 0x" + Integer.toHexString(address) + "\r\n").getBytes();
+		return (byte)getMemLocation(cmd, 2);
 	}
 
-	// OK
 	@Override
 	public short readHalfWord(int address) throws TargetConnectionException {
-		byte[] value = new byte[9];
-		int j = 0, val = 0, start=999;
-		int xPosition = 999;
-
-		try {
-			in.skip(in.available());
-			out.write(("mdh 0x" + Integer.toHexString(address) +	" \r\n").getBytes());
-			
-			int c;
-			while((c = in.read())!=-1) {
-					if (c < 0) 
-						throw new TargetConnectionException("target not answering");
-					
-					if ( (char)c == 'x' ) { xPosition = j;  }		// 0x00000100: 0004
-					if (j == xPosition+9) {
-						if ( (char)c == ':' )	start = xPosition + 11;
-						else					xPosition = 999;
-					}				
-					if (j >= start) {
-						value[j - start ] = (byte) c;
-//						if (dbg) StdStreams.vrb.println("[TARGET] start: " + (j-start) + " : "+ (char)c + " \r\n");
-					}
-					
-					if (j == start+3 ) {val = parseHex(value, 4); break;}
-					
-					j++;
-			}
-			if (dbg) StdStreams.vrb.println();		
-		} catch (Exception e) {
-			throw new TargetConnectionException(e.getMessage(), e);
-		}
-		return (short)val;
+		byte[] cmd = ("mdh 0x" + Integer.toHexString(address) + "\r\n").getBytes();
+		return (short)getMemLocation(cmd, 4);
 	}
 
-	// OK
 	@Override
 	public int readWord(int address) throws TargetConnectionException {
-		byte[] value = new byte[9];
-		int j = 0, val = 0, start=999;
-		int xPosition = 999;
-
-		try {
-			in.skip(in.available());
-			out.write(("mdw 0x" + Integer.toHexString(address) +	" \r\n").getBytes());
-			
-			int c;
-			while((c = in.read())!=-1) {
-					if (c < 0) 
-						throw new TargetConnectionException("target not answering");
-					
-					if ( (char)c == 'x' ) { xPosition = j;  }		// 0x00000100: e4101004
-					if (j == xPosition+9) {
-						if ( (char)c == ':' )	start = xPosition + 11;
-						else					xPosition = 999;
-					}				
-					if (j >= start) {
-						value[j - start ] = (byte) c;
-//						if (dbg) StdStreams.vrb.println("[TARGET] start: " + (j-start) + " : "+ (char)c + " \r\n");
-					}
-					
-					if (j == start+7 ) {val = parseHex(value, 8); break;}
-					
-					j++;
-			}
-			if (dbg) StdStreams.vrb.println();		
-		} catch (Exception e) {
-			throw new TargetConnectionException(e.getMessage(), e);
-		}
-		return val;
+		byte[] cmd = ("mdw 0x" + Integer.toHexString(address) + "\r\n").getBytes();
+		return getMemLocation(cmd, 8);
 	}
 
-	// not tested
 	@Override
 	public void writeByte(int address, byte data) throws TargetConnectionException {
 		try {
@@ -341,7 +226,6 @@ public class OpenOCD extends TargetConnection {
 		}
 	}
 
-	// not tested
 	@Override
 	public void writeHalfWord(int address, short data) throws TargetConnectionException {
 		try {
@@ -352,13 +236,11 @@ public class OpenOCD extends TargetConnection {
 		}
 	}
 
-	// OK
 	@Override
 	public void writeWord(int address, int data) throws TargetConnectionException {
 		try {
 			if (dbg) StdStreams.vrb.println("[TARGET] writing word 0x" + Integer.toHexString(data) + " to address 0x" + Integer.toHexString(address) + " (" + address + ")");
 			out.write(("mww 0x" + Integer.toHexString(address) + " 0x" + Integer.toHexString(data) + "\r\n").getBytes());
-//			waitForPrompt();
 		} catch (Exception e) {
 			throw new TargetConnectionException(e.getMessage(), e);
 		}
@@ -367,7 +249,6 @@ public class OpenOCD extends TargetConnection {
 	@Override
 	public void writeTMS(TargetMemorySegment tms) throws TargetConnectionException {
 		StdStreams.err.println("[TARGET] writeTMS(TargetMemorySegment tms) is not supportet with OpenOCD");
-		// not supported here
 	}
 
 	@Override
@@ -396,18 +277,6 @@ public class OpenOCD extends TargetConnection {
 		}		
 	}
 
-	private void waitForNL(int nofNL) throws Exception {
-		while (true) {
-			int n = in.available();
-			if (n <= 0) Thread.sleep(100);
-			int c = in.read();
-//			StdStreams.vrb.println((char)c);
-			if ((char)c == '\n') nofNL--;
-			if (c < 0) throw new TargetConnectionException("target not answering");
-			if (nofNL == 0) break;
-		}
-	}
-	
 	@Override
 	public void setBreakPoint(int address) throws TargetConnectionException {
 		if (dbg) StdStreams.vrb.println("[TARGET] setting breakpoint @ 0x" + Integer.toHexString(address) + ")\r\n");
@@ -434,39 +303,24 @@ public class OpenOCD extends TargetConnection {
 		
 	}
 
-	/* private methods */
-	
 	private synchronized int getGprValue(int gpr) throws TargetConnectionException {
 		byte[] value = new byte[9];
-		int j = 0, val = 0, c;
-		int start=999;
-		int xPosition = 999;
-
+		int c, j = 0, val = 0, start = 999, bracketPosition = 999;
 		try {
 			in.skip(in.available());
 			out.write(("reg " + gpr + "\r\n").getBytes());			
-
-			while((c = in.read())!=-1) {
-					if (c < 0) 
-						throw new TargetConnectionException("target not answering");
-					
-					if ( (char)c == '(' ) { xPosition = j;  }		// 0x00000100: 04
-					if (j == xPosition+5) {
-						if ( (char)c == ':' )	start = xPosition + 9;
-						else					xPosition = 999;
+			while((c = in.read()) != -1) {
+					if (c < 0) throw new TargetConnectionException("target not answering");
+					if ((char)c == '(') bracketPosition = j;
+					if (j == bracketPosition + 5) {
+						if ((char)c == ':')	start = bracketPosition + 9;
+						else bracketPosition = 999;
 					}				
-					if (j >= start && j<= start+7) {
-						value[j - start ] = (byte) c;
-//						if (dbg) StdStreams.vrb.println("[TARGET] start: " + (j-start) + " : "+ (char)c + " \r\n");
-					}
-					
-					if (j == start+7 ) {val = parseHex(value, 8); break; }
-					
+					if (j >= start && j<= start+7) value[j - start ] = (byte) c;
+					if (j == start + 7 ) {val = parseHex(value, 8); break;}
 					j++;
 			}
-
 			if (dbg) StdStreams.vrb.println("[TARGET] GPR" + gpr + " val: 0x" + Integer.toHexString(val));
-//			if (dbg) StdStreams.vrb.println();
 		} catch (Exception e) {
 			throw new TargetConnectionException(e.getMessage(), e);
 		}
@@ -474,148 +328,70 @@ public class OpenOCD extends TargetConnection {
 	}
 	
 	private synchronized long getFprValue(int fpr) throws TargetConnectionException {
-		if (dbg) StdStreams.vrb.println("[TARGET] getFprValue (" + fpr + ")\r\n");
+		if (dbg) StdStreams.vrb.println("[TARGET] getFprValue (" + fpr + ")");
 		final int memAddrStart = 0x64;
-		final int nofInstr = 1;
-//		final int vmovR0R1D0MachineCode = 0xEC510B10;
-		
-		int instruction = 0xEC510B10;	// VMOV	R0, R1, D0
-		instruction = instruction | ((fpr & 0x10) << 1) | (fpr & 0xf);
-		if (dbg) StdStreams.vrb.println("[TARGET] getFprValue instruction: 0x" + Integer.toHexString(instruction));
-		
-		// store registers
+		int instruction = 0xEC510B10;	// VMOV	R0, R1, fpr
+		instruction = instruction | ((fpr & 0x10) << 1) | (fpr & 0xf);		
+		// backup registers and memory
 		int pcStored = getGprValue(15);
 		int r0Stored = getGprValue(0);
 		int r1Stored = getGprValue(1);
-		// store 1x4 bytes @ 0x64
 		int memValue = readWord(memAddrStart);
-		
-//		if (dbg) StdStreams.vrb.println("[TARGET] store pc: 0x" + Integer.toHexString(pcStored));
-//		if (dbg) StdStreams.vrb.print(", r0: 0x" + Integer.toHexString(r0Stored));
-//		if (dbg) StdStreams.vrb.print(", r1: 0x" + Integer.toHexString(r1Stored) + "\r\n");
-//		if (dbg) StdStreams.vrb.print("          mem: 0x" + Integer.toHexString(memValue));
-//		if (dbg) StdStreams.vrb.print(", @ 0x" + Integer.toHexString(memAddrStart) + "\r\n");
-		
-		
-		// write 1x4 bytes @ 0x64 ("vmov r0, r1, d0")
 		writeWord(memAddrStart, instruction);
-		// set breakpoint to 0x68 (0x64 + nofInstr*4)
-		setBreakPoint(memAddrStart + nofInstr*4);
-		// set PC to 0x64
-		// continue CPU
-		startTarget(memAddrStart);
-		
-		// read r0, r1
+		setBreakPoint(memAddrStart + 4);
+		startTarget(memAddrStart);	// set PC to 0x64 and continue
 		int r0Float = getGprValue(0);
 		int r1Float = getGprValue(1);
-		// parse r0, r1
 		long fprValue = ((long)r1Float << 32) | ((long)r0Float & 0xffffffffL);
-
-//		if (dbg) StdStreams.vrb.println("[TARGET] read FPU registers r0: 0x" + Integer.toHexString(r0Float));
-//		if (dbg) StdStreams.vrb.print(", r1: 0x" + Integer.toHexString(r1Float) + "\r\n");
 		if (dbg) StdStreams.vrb.println("[TARGET] read FPU registers fprValue: 0x" + Long.toHexString(fprValue));
-		
-		
-		// remove breakpoint
-		removeBreakPoint(memAddrStart + nofInstr*4);
-		// restore 1x4 bytes
+		removeBreakPoint(memAddrStart + 4);
+		// restore registers and memory
 		writeWord(memAddrStart, memValue);
-		// restore registers
 		setRegisterValue("PC", pcStored);
 		setRegisterValue("R0", r0Stored);
 		setRegisterValue("R1", r1Stored);
-		
-
 		return fprValue;
 	}
-	
-	//not tested
+
 	private long getFpscrValue() throws TargetConnectionException {
-		if (dbg) StdStreams.vrb.println("[TARGET] getFpscrValue \r\n");
+		if (dbg) StdStreams.vrb.println("[TARGET] getFpscrValue");
 		final int memAddrStart = 0x64;
-		final int nofInstr = 1;
-		
 		int instruction = 0xEEF10A10;	// VMRS R0, FPSCR
-		
-		// store r15 (PC)
+		// backup registers and memory
 		int pcStored = getGprValue(15);
-		// store r0
 		int r0Stored = getGprValue(0);
-		// store 1x4 bytes @ 0x64
 		int memValue = readWord(memAddrStart);
-		
-//		if (dbg) StdStreams.vrb.println("[TARGET] store pc: 0x" + Integer.toHexString(pcStored));
-//		if (dbg) StdStreams.vrb.print(", r0: 0x" + Integer.toHexString(r0Stored));
-//		if (dbg) StdStreams.vrb.print(", r1: 0x" + Integer.toHexString(r1Stored) + "\r\n");
-//		if (dbg) StdStreams.vrb.print("          mem: 0x" + Integer.toHexString(memValue));
-//		if (dbg) StdStreams.vrb.print(", @ 0x" + Integer.toHexString(memAddrStart) + "\r\n");
-		
-		
-		// write 1x4 bytes @ 0x64
 		writeWord(memAddrStart, instruction);
-		// set breakpoint to 0x68 (0x64 + nofInstr*4)
-		setBreakPoint(memAddrStart + nofInstr*4);
-		// set PC to 0x64
-		// continue CPU
-		startTarget(memAddrStart);
-		
-		// read r0,
+		setBreakPoint(memAddrStart + 4);
+		startTarget(memAddrStart);	// set PC to 0x64 and continue
 		int fpscr = getGprValue(0);
 		if (dbg) StdStreams.vrb.println("[TARGET] read FPSCR value: 0x" + Long.toHexString(fpscr));
-		
-		
-		// remove breakpoint
-		removeBreakPoint(memAddrStart + nofInstr*4);
-		// restore 1x4 bytes
+		removeBreakPoint(memAddrStart + 4);
+		// restore registers and memory
 		writeWord(memAddrStart, memValue);
-		// restore registers
 		setRegisterValue("PC", pcStored);
 		setRegisterValue("R0", r0Stored);
-		
-
 		return fpscr;
 	}
 
 	private void setFprValue(int addr, long value) throws TargetConnectionException {
 		final int memAddrStart = 0x64;
-		final int nofInstr = 1;
-		
-		int instruction = 0xEC410B10;	// VMOV	D0, R0, R1
+		int instruction = 0xEC410B10;	// VMOV	Di, R0, R1
 		instruction = instruction | ((addr & 0x10) << 1) | (addr & 0xf);
 		if (dbg) StdStreams.vrb.println("[TARGET] setFprValue instruction: 0x" + Integer.toHexString(instruction));
-		
-		// store registers
+		// backup registers and memory
 		int pcStored = getGprValue(15);
 		int r0Stored = getGprValue(0);
 		int r1Stored = getGprValue(1);
-		// store 1x4 bytes @ 0x64
 		int memValue = readWord(memAddrStart);
-		
-//		if (dbg) StdStreams.vrb.println("[TARGET] store pc: 0x" + Integer.toHexString(pcStored));
-//		if (dbg) StdStreams.vrb.print(", r0: 0x" + Integer.toHexString(r0Stored));
-//		if (dbg) StdStreams.vrb.print(", r1: 0x" + Integer.toHexString(r1Stored) + "\r\n");
-//		if (dbg) StdStreams.vrb.print("          mem: 0x" + Integer.toHexString(memValue));
-//		if (dbg) StdStreams.vrb.print(", @ 0x" + Integer.toHexString(memAddrStart) + "\r\n");
-		
-		// set r0, r1
-		long r0 = value & 0x0000ffff;
-		long r1 = (value & 0xffff0000) >> 32;
-		setRegisterValue("R0", r0);
-		setRegisterValue("R1", r1);
-		
-		// write 1x4 bytes @ 0x64
+		setRegisterValue("R0", value & 0xffffffff);
+		setRegisterValue("R1", (value >> 32) & 0xffffffff);
 		writeWord(memAddrStart, instruction);
-		// set breakpoint to 0x68 (0x64 + nofInstr*4)
-		setBreakPoint(memAddrStart + nofInstr*4);
-		// set PC to 0x64
-		// continue CPU
-		startTarget(memAddrStart);
-		
-		// remove breakpoint
-		removeBreakPoint(memAddrStart + nofInstr*4);
-		// restore 1x4 bytes
+		setBreakPoint(memAddrStart + 4);
+		startTarget(memAddrStart);	// set PC to 0x64 and continue
+		removeBreakPoint(memAddrStart + 4);
+		// restore registers and memory
 		writeWord(memAddrStart, memValue);
-		// restore registers
 		setRegisterValue("PC", pcStored);
 		setRegisterValue("R0", r0Stored);
 		setRegisterValue("R1", r1Stored);
@@ -623,43 +399,59 @@ public class OpenOCD extends TargetConnection {
 
 	private void setFpscrValue(long value) throws TargetConnectionException {
 		final int memAddrStart = 0x64;
-		final int nofInstr = 1;
-		
 		int instruction = 0xEEE10A10;	// VMSR	FPSCR, R0
 		if (dbg) StdStreams.vrb.println("[TARGET] setFpscrValue instruction: 0x" + Integer.toHexString(instruction));
-		
-		// store registers
+		// backup registers and memory
 		int pcStored = getGprValue(15);
 		int r0Stored = getGprValue(0);
-		// store 1x4 bytes @ 0x64
 		int memValue = readWord(memAddrStart);
-		
-//		if (dbg) StdStreams.vrb.println("[TARGET] store pc: 0x" + Integer.toHexString(pcStored));
-//		if (dbg) StdStreams.vrb.print(", r0: 0x" + Integer.toHexString(r0Stored));
-//		if (dbg) StdStreams.vrb.print(", r1: 0x" + Integer.toHexString(r1Stored) + "\r\n");
-//		if (dbg) StdStreams.vrb.print("          mem: 0x" + Integer.toHexString(memValue));
-//		if (dbg) StdStreams.vrb.print(", @ 0x" + Integer.toHexString(memAddrStart) + "\r\n");
-		
-		// set r0
 		setRegisterValue("R0", value);
-		
-		// write 1x4 bytes @ 0x64
 		writeWord(memAddrStart, instruction);
-		// set breakpoint to 0x68 (0x64 + nofInstr*4)
-		setBreakPoint(memAddrStart + nofInstr*4);
-		// set PC to 0x64
-		// continue CPU
-		startTarget(memAddrStart);
-		
-		// remove breakpoint
-		removeBreakPoint(memAddrStart + nofInstr*4);
-		// restore 1x4 bytes
+		setBreakPoint(memAddrStart + 4);
+		startTarget(memAddrStart);	// set PC to 0x64 and continue
+		removeBreakPoint(memAddrStart + 4);
+		// restore registers and memory
 		writeWord(memAddrStart, memValue);
-		// restore registers
 		setRegisterValue("PC", pcStored);
 		setRegisterValue("R0", r0Stored);
 	}
+	
+	private int getMemLocation(byte[] cmd, int nofDigits) throws TargetConnectionException {
+		byte[] value = new byte[9];
+		int c, j = 0, val = 0, start = 999, xPosition = 999;
+		try {
+			in.skip(in.available());
+			out.write(cmd);
+			while ((c = in.read()) != -1) {
+				if (c < 0) throw new TargetConnectionException("target not answering");
+				if ((char)c == 'x') xPosition = j;
+				if (j == xPosition + 9) {
+					if ((char)c == ':') start = j + 2;
+					else xPosition = 999;
+				}				
+				if (j >= start) value[j - start ] = (byte) c;
+				if (j == start + nofDigits - 1) {val = parseHex(value, nofDigits); break;}
+				j++;
+			}
+			if (dbg) StdStreams.vrb.println();		
+		} catch (Exception e) {
+			throw new TargetConnectionException(e.getMessage(), e);
+		}
+		return val;
+	}
 
+	private void waitForNL(int nofNL) throws Exception {
+		while (true) {
+			int n = in.available();
+			if (n <= 0) Thread.sleep(100);
+			int c = in.read();
+//			StdStreams.vrb.println((char)c);
+			if ((char)c == '\n') nofNL--;
+			if (c < 0) throw new TargetConnectionException("target not answering");
+			if (nofNL == 0) break;
+		}
+	}
+	
 	private int parseHex(byte[] hex, int len)  {
 		int value = 0;
 		for (int i = 0; i < len; i++) {
@@ -672,13 +464,4 @@ public class OpenOCD extends TargetConnection {
 		}
 		return value;
 	}
-
-
-	@Override
-	public long[] getRegisterBlock(String block) throws TargetConnectionException {
-		// TODO Auto-generated method stub
-		return null;
-	}
-	
-
 }
