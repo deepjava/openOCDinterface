@@ -158,6 +158,8 @@ public class OpenOCD extends TargetConnection {
 			case Parser.sFPSCR:
 				setFpscrValue(value);
 				break;
+			case Parser.sCPR:
+				setCprValue(reg.address, value);
 			case Parser.sIOR:	// is used solely by launcher not by target operation view
 				writeWord(reg.address, (int)value);
 				break;
@@ -184,8 +186,8 @@ public class OpenOCD extends TargetConnection {
 			return getGprValue(reg.address);
 		case Parser.sFPR:
 			return getFprValue(reg.address);
-//		case Parser.sCPR:
-//			return getSprValue(reg.address);
+		case Parser.sCPR:
+			return getCprValue(reg.address);
 		case Parser.sFPSCR:
 			return getFpscrValue();
 		default:
@@ -327,7 +329,7 @@ public class OpenOCD extends TargetConnection {
 		return val;
 	}
 	
-	private synchronized long getFprValue(int fpr) throws TargetConnectionException {
+	private long getFprValue(int fpr) throws TargetConnectionException {
 		if (dbg) StdStreams.vrb.println("[TARGET] getFprValue (" + fpr + ")");
 		final int memAddrStart = 0x64;
 		int instruction = 0xEC510B10;	// VMOV	R0, R1, fpr
@@ -374,6 +376,33 @@ public class OpenOCD extends TargetConnection {
 		return fpscr;
 	}
 
+	private long getCprValue(int addr) throws TargetConnectionException {
+		int coproc = (addr >> 16) & 0xf;
+		int CRn = (addr >> 12) & 0xf;
+		int opc1 = (addr >> 8) & 0xf;
+		int CRm = (addr >> 4) & 0xf;
+		int opc2 = addr & 0xf;
+		if (dbg) StdStreams.vrb.println("[TARGET] getCprValue (" + coproc + ", " + CRn + ", " + opc1 + ", " + CRm + ", " + opc2 + ")");
+		final int memAddrStart = 0x64;
+		int instruction = 0xEE100010;	// MRC	coproc, opc1, R0, CRn, CRm, opc2
+		instruction = instruction | (coproc << 8) | (CRn << 16) | CRm | (opc1 << 21) | (opc2 << 5);		
+		// backup registers and memory
+		int pcStored = getGprValue(15);
+		int r0Stored = getGprValue(0);
+		int memValue = readWord(memAddrStart);
+		writeWord(memAddrStart, instruction);
+		setBreakPoint(memAddrStart + 4);
+		startTarget(memAddrStart);	// set PC to 0x64 and continue
+		int cprValue = getGprValue(0);
+		if (dbg) StdStreams.vrb.println("[TARGET] read CPR registers value: 0x" + Long.toHexString(cprValue));
+		removeBreakPoint(memAddrStart + 4);
+		// restore registers and memory
+		writeWord(memAddrStart, memValue);
+		setRegisterValue("PC", pcStored);
+		setRegisterValue("R0", r0Stored);
+		return cprValue;
+	}
+
 	private void setFprValue(int addr, long value) throws TargetConnectionException {
 		final int memAddrStart = 0x64;
 		int instruction = 0xEC410B10;	// VMOV	Di, R0, R1
@@ -416,6 +445,31 @@ public class OpenOCD extends TargetConnection {
 		setRegisterValue("R0", r0Stored);
 	}
 	
+	private void setCprValue(int addr, long value) throws TargetConnectionException {
+		int coproc = (addr >> 16) & 0xf;
+		int CRn = (addr >> 12) & 0xf;
+		int opc1 = (addr >> 8) & 0xf;
+		int CRm = (addr >> 4) & 0xf;
+		int opc2 = addr & 0xf;
+		if (dbg) StdStreams.vrb.println("[TARGET] setCprValue (" + coproc + ", " + CRn + ", " + opc1 + ", " + CRm + ", " + opc2 + ")");
+		final int memAddrStart = 0x64;
+		int instruction = 0xEE001010;	// MCR	coproc, opc1, R1, CRn, CRm, opc2
+		instruction = instruction | (coproc << 8) | (CRn << 16) | CRm | (opc1 << 21) | (opc2 << 5);		
+		// backup registers and memory
+		int pcStored = getGprValue(15);
+		int r0Stored = getGprValue(1);
+		int memValue = readWord(memAddrStart);
+		writeWord(memAddrStart, instruction);
+		setRegisterValue("R1", value);
+		setBreakPoint(memAddrStart + 4);
+		startTarget(memAddrStart);	// set PC to 0x64 and continue
+		removeBreakPoint(memAddrStart + 4);
+		// restore registers and memory
+		writeWord(memAddrStart, memValue);
+		setRegisterValue("PC", pcStored);
+		setRegisterValue("R1", r0Stored);
+	}
+
 	private int getMemLocation(byte[] cmd, int nofDigits) throws TargetConnectionException {
 		byte[] value = new byte[9];
 		int c, j = 0, val = 0, start = 999, xPosition = 999;
