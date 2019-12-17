@@ -41,6 +41,7 @@ public class OpenOCD extends TargetConnection {
 	public void openConnection() throws TargetConnectionException {
 		try {
 			socket = new Socket(hostname, port);
+			socket.setSoTimeout(1000);
 			out = socket.getOutputStream();
 			in = socket.getInputStream();
 			if (dbg) StdStreams.vrb.println("[TARGET] Connected ");
@@ -67,9 +68,6 @@ public class OpenOCD extends TargetConnection {
 	public void closeConnection() {
 		try {
 			if (socket != null) socket.close();
-			socket = null;
-			out = null;
-			in = null;
 		} catch (IOException e) {
 			// do nothing
 		}
@@ -266,6 +264,7 @@ public class OpenOCD extends TargetConnection {
             out.write(("initPS\r\n").getBytes());
 
             StringBuffer buf = new StringBuffer();
+			socket.setSoTimeout(5000);
             while (true) {
                    int n = in.available();
                    if (n <= 0) {
@@ -304,6 +303,32 @@ public class OpenOCD extends TargetConnection {
 					}
 				}
 			}
+			
+			//if(downloadBitstream) {
+			/* Download bitstream temporary */
+			while (in.available() > 0) in.read();	// empty buffer
+			StdStreams.log.print("Downloading bitstream");
+			out.write(("pld load 0 D:/flinkDeep.bit\r\n").getBytes());
+			while (true) {
+				int n = in.available();
+				if (n <= 0) {
+					Thread.sleep(100);
+					StdStreams.log.print(".");
+				}
+				int c = in.read();
+				if (c < 0) throw new TargetConnectionException("target not answering");
+				
+				buf.append((char)c);
+				if (buf.indexOf("loaded file") > 0) {
+					StdStreams.log.println();
+					waitForNL(1);
+					StdStreams.log.println("Bitstream download complete");
+					break;
+				}
+			}
+		//}
+
+			socket.setSoTimeout(1000);
 		} catch (Exception e) {
 			throw new TargetConnectionException(e.getMessage(), e);
 		}		
