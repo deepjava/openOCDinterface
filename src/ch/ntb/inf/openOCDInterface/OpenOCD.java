@@ -259,8 +259,8 @@ public class OpenOCD extends TargetConnection {
 			while (in.available() > 0) in.read();	// empty buffer
 			out.write((("halt\r\n").getBytes()));
 			
-            /*Init PS*/
-            StdStreams.log.print("Initializing PS");
+            /* init PS */
+            StdStreams.log.print("Initializing PS ");
             out.write(("initPS\r\n").getBytes());
 
             StringBuffer buf = new StringBuffer();
@@ -303,30 +303,34 @@ public class OpenOCD extends TargetConnection {
 					}
 				}
 			}
-			
-			//if(downloadBitstream) {
-			/* Download bitstream temporary */
-			while (in.available() > 0) in.read();	// empty buffer
-			StdStreams.log.print("Downloading bitstream");
-			out.write(("pld load 0 D:/flinkDeep.bit\r\n").getBytes());
-			while (true) {
-				int n = in.available();
-				if (n <= 0) {
-					Thread.sleep(100);
-					StdStreams.log.print(".");
-				}
-				int c = in.read();
-				if (c < 0) throw new TargetConnectionException("target not answering");
-				
-				buf.append((char)c);
-				if (buf.indexOf("loaded file") > 0) {
-					StdStreams.log.println();
-					waitForNL(1);
-					StdStreams.log.println("Bitstream download complete");
-					break;
+
+			/* init PL */
+			String file = Configuration.getPlFile();
+			if (file != null) {
+				while (in.available() > 0) in.read();	// empty buffer
+				StdStreams.log.print("Downloading bitstream " + file + " ");
+				out.write(("pld load 0 " + file + "\r\n").getBytes());
+				while (true) {
+					int n = in.available();
+					if (n <= 0) {
+						Thread.sleep(100);
+						StdStreams.log.print(".");
+					}
+					int c = in.read();
+					if (c < 0) throw new TargetConnectionException("target not answering");
+
+					buf.append((char)c);
+					if (buf.indexOf("loaded file") > 0) {
+						waitForNL(1);
+						StdStreams.log.println(" download complete");
+						break;
+					}
+					if (buf.indexOf("No such file") > 0) {
+						waitForNL(1);
+						throw new TargetConnectionException("no such file");
+					}
 				}
 			}
-		//}
 
 			socket.setSoTimeout(1000);
 		} catch (Exception e) {
