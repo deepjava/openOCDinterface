@@ -258,36 +258,39 @@ public class OpenOCD extends TargetConnection {
 		try {
 			while (in.available() > 0) in.read();	// empty buffer
 			out.write((("halt\r\n").getBytes()));
-			
-            /* init PS */
-            StdStreams.log.print("Initializing PS ");
-            out.write(("initPS\r\n").getBytes());
 
-            StringBuffer buf = new StringBuffer();
-			socket.setSoTimeout(5000);
-            while (true) {
-                   int n = in.available();
-                   if (n <= 0) {
-                          Thread.sleep(100);
-                          StdStreams.log.print(".");
-                   }
-                   int c = in.read();
-                   if (c < 0) throw new TargetConnectionException("target not answering");
-                   
-                   buf.append((char)c);
-                   if (buf.indexOf("initializing") > 0) {
-                          waitForNL(1);
-                          StdStreams.log.println(" initPS complete");
-                          break;
-                   }
-            }
+			/* init PS */
+			StdStreams.log.print("Initializing PS ");
+			out.write(("initPS\r\n").getBytes());
+
+			StringBuffer buf = new StringBuffer();
+			socket.setSoTimeout(8000);
+			while (true) {
+				int n = in.available();
+				if (n <= 0) {
+					Thread.sleep(10);
+					StdStreams.log.print(".");
+				}
+				int c = in.read();
+//				StdStreams.log.print((char)c);
+				if (c < 0) throw new TargetConnectionException("target not answering");
+				buf.append((char)c);
+				if (buf.indexOf("initializing") > 0) {
+					waitForNL(1);
+					StdStreams.log.println(" initPS complete");
+					break;
+				}
+				if (buf.indexOf("Invalid ACK (0) in DAP response") >= 0) {
+					throw new TargetConnectionException("target not connected");
+				} 
+			}
 
 			ArrayList<Map.Entry<String,Integer>> files = Configuration.getImgFile();
 			if (files.isEmpty()) StdStreams.err.println("no image files available");
 			for (Map.Entry<String,Integer> file : files) {
 				String name = file.getKey();
 				name = name.replace('\\', '/');
-	            StdStreams.log.println("Downloading " + name);
+				StdStreams.log.println("Downloading " + name);
 				out.write((("load_image " + name + " " + file.getValue() + " \r\n").getBytes()));
 				if (dbg) StdStreams.vrb.println("[TARGET] loading: " + name);
 				buf = new StringBuffer();
