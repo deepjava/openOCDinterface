@@ -85,8 +85,8 @@ public class OpenOCD extends TargetConnection {
 		int timeout = 5;		// in sleepcycles of 100 msec
 		try {
 			in.skip(in.available());
-			out.write(("reg 0 \r\n").getBytes());		// try to read register to check if system is halted
-			boolean state = false;
+			out.write(("wait_halt 10 \r\n").getBytes());		// try to read register to check if system is halted
+			int count = 0;
 			while (true) {
 				int n = in.available();
 				if (n <= 0) {
@@ -95,9 +95,11 @@ public class OpenOCD extends TargetConnection {
 					if (timeout == 0) throw new TargetConnectionException("getTargetState() : unexpected answer");
 				} else { 
 					int c = in.read();
+					count++;
 					if (c < 0) throw new TargetConnectionException("target not answering");	
-					if ((char)c == 'T')	state = true;		// "Target not halted"
-					if ((char)c == ':') return state? stateRunning: stateDebug;
+					if (count == 18) {
+						if ((char)c == '>')	return stateDebug; else return stateRunning;
+					}
 				}
 			}
 		} catch (Exception e) {
@@ -135,7 +137,9 @@ public class OpenOCD extends TargetConnection {
 	public void resetTarget() throws TargetConnectionException {
 		if (dbg) StdStreams.vrb.println("[TARGET] Reseting");
 		try {
-			out.write(("reset halt\r\n".getBytes()));
+			out.write(("reset\r\n".getBytes()));
+			Thread.sleep(1000);
+			out.write(("halt\r\n".getBytes()));
 		} catch (Exception e) {
 			throw new TargetConnectionException(e.getMessage(), e);
 		}
@@ -190,6 +194,8 @@ public class OpenOCD extends TargetConnection {
 			return getCprValue(reg.address);
 		case Parser.sFPSCR:
 			return getFpscrValue();
+		case Parser.sIOR:	// is used solely by launcher not by target operation view
+			return readWord(reg.address);
 		default:
 			return defaultValue;
 		}
@@ -256,38 +262,15 @@ public class OpenOCD extends TargetConnection {
 	@Override
 	public void downloadImageFile(String filename) throws TargetConnectionException {
 		try {
+			socket.setSoTimeout(1000);
 			while (in.available() > 0) in.read();	// empty buffer
 			out.write((("halt\r\n").getBytes()));
 
-			/* init PS */
-			StdStreams.log.print("Initializing PS ");
-			out.write(("initPS\r\n").getBytes());
-
 			StringBuffer buf = new StringBuffer();
-			socket.setSoTimeout(8000);
-			while (true) {
-				int n = in.available();
-				if (n <= 0) {
-					Thread.sleep(10);
-					StdStreams.log.print(".");
-				}
-				int c = in.read();
-//				StdStreams.log.print((char)c);
-				if (c < 0) throw new TargetConnectionException("target not answering");
-				buf.append((char)c);
-				if (buf.indexOf("initializing") > 0) {
-					waitForNL(1);
-					StdStreams.log.println(" initPS complete");
-					break;
-				}
-				if (buf.indexOf("Invalid ACK (0) in DAP response") >= 0) {
-					throw new TargetConnectionException("target not connected");
-				} 
-			}
-
 			ArrayList<Map.Entry<String,Integer>> files = Configuration.getImgFile();
 			if (files.isEmpty()) StdStreams.err.println("no image files available");
 			for (Map.Entry<String,Integer> file : files) {
+				socket.setSoTimeout(3000);
 				String name = file.getKey();
 				name = name.replace('\\', '/');
 				StdStreams.log.println("Downloading " + name);
@@ -313,6 +296,7 @@ public class OpenOCD extends TargetConnection {
 				while (in.available() > 0) in.read();	// empty buffer
 				StdStreams.log.print("Downloading bitstream " + file + " ");
 				out.write(("pld load 0 " + file + "\r\n").getBytes());
+				socket.setSoTimeout(10000);
 				while (true) {
 					int n = in.available();
 					if (n <= 0) {
@@ -334,8 +318,6 @@ public class OpenOCD extends TargetConnection {
 					}
 				}
 			}
-
-			socket.setSoTimeout(1000);
 		} catch (Exception e) {
 			throw new TargetConnectionException(e.getMessage(), e);
 		}		
