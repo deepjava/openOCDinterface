@@ -1,24 +1,26 @@
-package ch.ntb.inf.openOCDInterface;
+package org.deepjava.openOCDInterface;
 
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Map;
+
+import org.deepjava.config.Configuration;
+import org.deepjava.config.Parser;
+import org.deepjava.config.Register;
+import org.deepjava.host.StdStreams;
+import org.deepjava.linker.TargetMemorySegment;
+import org.deepjava.strings.HString;
+import org.deepjava.target.TargetConnection;
+import org.deepjava.target.TargetConnectionException;
+
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
-import ch.ntb.inf.deep.config.Configuration;
-import ch.ntb.inf.deep.config.Parser;
-import ch.ntb.inf.deep.config.Register;
-import ch.ntb.inf.deep.host.StdStreams;
-import ch.ntb.inf.deep.linker.TargetMemorySegment;
-import ch.ntb.inf.deep.strings.HString;
-import ch.ntb.inf.deep.target.TargetConnection;
-import ch.ntb.inf.deep.target.TargetConnectionException;
-
 public class OpenOCD extends TargetConnection {
 
-	private static boolean dbg = false;
+	private static boolean dbg = true;
 	private static TargetConnection tc;
 	private String hostname;
 	private int port;
@@ -39,7 +41,21 @@ public class OpenOCD extends TargetConnection {
 		
 	@Override
 	public void openConnection() throws TargetConnectionException {
+		if (dbg) StdStreams.vrb.println("[TARGET] Open connection");	
 		try {
+			String currLoc = new File(".").getAbsolutePath();
+			currLoc = currLoc.replace(currLoc.substring(currLoc.length()-1), "");
+			currLoc += "\\startOpenocd-local.bat";
+			String name = "F:\\openocd-0.10.0\\startOpenocdMicrozed.bat";
+			StdStreams.vrb.println("run openocd: " + name);
+			File dir = new File("F:\\openocd-0.10.0");
+			Process p = Runtime.getRuntime().exec("cmd /c start \"\" " + name, null, dir);
+			if (p != null) {
+				if (dbg) StdStreams.vrb.println("OpenOCD process not null, " + p.toString());
+			} else {
+				if (dbg) StdStreams.vrb.println("OpenOCD process null");
+			}
+			
 			socket = new Socket(hostname, port);
 			socket.setSoTimeout(1000);
 			out = socket.getOutputStream();
@@ -72,17 +88,71 @@ public class OpenOCD extends TargetConnection {
 			// do nothing
 		}
 		if (dbg) StdStreams.vrb.println("[TARGET] Connection closed");	
+		System.out.println("closing");
 	}
 
 	@Override
 	public boolean isConnected() {
-		if (socket == null) return false;
+		if (dbg) StdStreams.vrb.println("[TARGET] check for target connection");	
+
+//		/* check if openocd is running */
+//		boolean openOcdAvail = false;
+//		StdStreams.vrb.println("get process");
+//		Process p = null;
+//		try {
+//			p = Runtime.getRuntime().exec(System.getenv("windir")+"\\system32\\"+"tasklist.exe /v");
+//		} catch (IOException e) {
+//			// TODO Auto-generated catch block
+//			e.printStackTrace();
+//		}
+//		StdStreams.vrb.println("get input stream");
+//		BufferedReader input = new BufferedReader(new InputStreamReader(p.getInputStream()));
+//		
+//		StdStreams.vrb.println("add lines to pidInfo");
+//		String line;
+//		try {
+//			while ((line = input.readLine()) != null) {
+////				StdStreams.vrb.println(line);
+//				if (line.contains("openocd")) {
+//					if(line.contains("Running")) {
+//						openOcdAvail = true;
+//						StdStreams.vrb.println("found openocd, state running");
+//						break;
+//					} else {
+//						openOcdAvail = true;
+//						StdStreams.vrb.println("found openocd, not running");
+//					}
+//				}
+//			}
+//		} catch (IOException e) {
+//			// TODO Auto-generated catch block
+//			e.printStackTrace();
+//		}
+//		
+//		if (!openOcdAvail) {
+//			StdStreams.vrb.println("should start openocd");
+//		}
+//		
+////		input.close();
+		try {
+			if (socket == null || socket.getInputStream() == null) return false;
+			if (dbg) StdStreams.vrb.println("[TARGET] check returns " + (socket == null) + " " + socket.isConnected() + " " + socket.isClosed() + " " + socket.isOutputShutdown());	
+			int nof = socket.getInputStream().read();
+			if (dbg) StdStreams.vrb.println("[TARGET] read returns " + nof);
+			if ( nof == -1) {
+				return false;
+			}
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+//			e.printStackTrace();
+			return false;
+		}
 		return (socket.isConnected() && !socket.isClosed());
 	}
 	
 	@Override
 	public int getTargetState() throws TargetConnectionException {
-		int timeout = 5;		// in sleepcycles of 100 msec
+		int timeout = 5;		// in sleep cycles of 100ms
 		try {
 			in.skip(in.available());
 			out.write(("wait_halt 10 \r\n").getBytes());		// try to read register to check if system is halted
