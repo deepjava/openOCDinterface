@@ -20,7 +20,7 @@ import java.io.OutputStream;
 
 public class OpenOCD extends TargetConnection {
 
-	private static boolean dbg = true;
+	private static boolean dbg = false;
 	private static TargetConnection tc;
 	private String hostname;
 	private int port;
@@ -33,7 +33,7 @@ public class OpenOCD extends TargetConnection {
 	public static TargetConnection getInstance() {
 		if (tc != null && !tc.isConnected()) tc = null;
 		if (tc == null) {
-			if (dbg) StdStreams.vrb.println("[TARGET] OpenOCD: Creating new OpenOCD Telnet");
+			if (dbg) StdStreams.vrb.println("[TARGET] OpenOCD: Creating new OpenOCD telnet connection");
 			tc = new OpenOCD();
 		}
 		return tc;
@@ -47,7 +47,7 @@ public class OpenOCD extends TargetConnection {
 			currLoc = currLoc.replace(currLoc.substring(currLoc.length()-1), "");
 			currLoc += "\\startOpenocd-local.bat";
 			String name = "F:\\openocd-0.10.0\\startOpenocdMicrozed.bat";
-			StdStreams.vrb.println("run openocd: " + name);
+//			StdStreams.vrb.println("run openocd: " + name);
 			File dir = new File("F:\\openocd-0.10.0");
 			Process p = Runtime.getRuntime().exec("cmd /c start \"\" " + name, null, dir);
 			if (p != null) {
@@ -88,7 +88,6 @@ public class OpenOCD extends TargetConnection {
 			// do nothing
 		}
 		if (dbg) StdStreams.vrb.println("[TARGET] Connection closed");	
-		System.out.println("closing");
 	}
 
 	@Override
@@ -340,7 +339,7 @@ public class OpenOCD extends TargetConnection {
 			ArrayList<Map.Entry<String,Integer>> files = Configuration.getImgFile();
 			if (files.isEmpty()) StdStreams.err.println("no image files available");
 			for (Map.Entry<String,Integer> file : files) {
-				socket.setSoTimeout(3000);
+				socket.setSoTimeout(8000);
 				String name = file.getKey();
 				name = name.replace('\\', '/');
 				StdStreams.log.println("Downloading " + name);
