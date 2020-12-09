@@ -43,18 +43,18 @@ public class OpenOCD extends TargetConnection {
 	public void openConnection() throws TargetConnectionException {
 		if (dbg) StdStreams.vrb.println("[TARGET] Open connection");	
 		try {
-			String currLoc = new File(".").getAbsolutePath();
-			currLoc = currLoc.replace(currLoc.substring(currLoc.length()-1), "");
-			currLoc += "\\startOpenocd-local.bat";
-			String name = "F:\\openocd-0.10.0\\startOpenocdMicrozed.bat";
-//			StdStreams.vrb.println("run openocd: " + name);
-			File dir = new File("F:\\openocd-0.10.0");
-			Process p = Runtime.getRuntime().exec("cmd /c start \"\" " + name, null, dir);
-			if (p != null) {
-				if (dbg) StdStreams.vrb.println("OpenOCD process not null, " + p.toString());
-			} else {
-				if (dbg) StdStreams.vrb.println("OpenOCD process null");
-			}
+//			String currLoc = new File(".").getAbsolutePath();
+//			currLoc = currLoc.replace(currLoc.substring(currLoc.length()-1), "");
+//			currLoc += "\\startOpenocd-local.bat";
+//			String name = "F:\\openocd-0.10.0\\startOpenocdMicrozed.bat";
+////			StdStreams.vrb.println("run openocd: " + name);
+//			File dir = new File("F:\\openocd-0.10.0");
+//			Process p = Runtime.getRuntime().exec("cmd /c start \"\" " + name, null, dir);
+//			if (p != null) {
+//				if (dbg) StdStreams.vrb.println("OpenOCD process not null, " + p.toString());
+//			} else {
+//				if (dbg) StdStreams.vrb.println("OpenOCD process null");
+//			}
 			
 			socket = new Socket(hostname, port);
 			socket.setSoTimeout(1000);
