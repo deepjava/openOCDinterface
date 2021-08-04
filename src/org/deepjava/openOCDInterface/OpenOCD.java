@@ -180,8 +180,8 @@ public class OpenOCD extends TargetConnection {
 	public void startTarget(int address) throws TargetConnectionException {
 		try {
 			if (address != -1) {
-					if (dbg) StdStreams.vrb.println("[TARGET] arm: Starting from 0x" + Integer.toHexString(address));
-					out.write((("resume " + address + "\r\n").getBytes()));
+				if (dbg) StdStreams.vrb.println("[TARGET] arm: Starting from 0x" + Integer.toHexString(address));
+				out.write((("resume " + address + "\r\n").getBytes()));
 			} else {
 				if (dbg) StdStreams.vrb.println("[TARGET] Resume target");
 				out.write(("resume\r\n".getBytes()));
@@ -344,7 +344,7 @@ public class OpenOCD extends TargetConnection {
 				name = name.replace('\\', '/');
 				StdStreams.log.println("Downloading " + name);
 				out.write((("load_image " + name + " " + file.getValue() + " \r\n").getBytes()));
-				if (dbg) StdStreams.vrb.println("[TARGET] loading: " + name);
+				if (dbg) StdStreams.vrb.println("[TARGET] loading: " + name + " to addr 0x" + Integer.toHexString(file.getValue()));
 				buf = new StringBuffer();
 				while (true) {
 					int n = in.available();
