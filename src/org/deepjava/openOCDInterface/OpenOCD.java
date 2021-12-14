@@ -7,12 +7,13 @@ import java.util.Map;
 import org.deepjava.config.Configuration;
 import org.deepjava.config.Parser;
 import org.deepjava.config.Register;
+import org.deepjava.eclipse.DeepPlugin;
+import org.deepjava.eclipse.ui.preferences.PreferenceConstants;
 import org.deepjava.host.StdStreams;
 import org.deepjava.linker.TargetMemorySegment;
 import org.deepjava.strings.HString;
 import org.deepjava.target.TargetConnection;
 import org.deepjava.target.TargetConnectionException;
-
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -49,14 +50,11 @@ public class OpenOCD extends TargetConnection {
 			in = socket.getInputStream();
 		} catch (IOException e) {
 			if (dbg) StdStreams.vrb.println("[TARGET] no socket connection possible, start OpenOCD");
-			String currLoc = new File(".").getAbsolutePath();
-			currLoc = currLoc.replace(currLoc.substring(currLoc.length()-1), "");
-			currLoc += "\\startOpenocd-local.bat";
-			String name = "F:\\openocd-0.10.0\\startOpenocdMicrozed.bat";
-			if (dbg) StdStreams.log.println("run openocd: " + name);
-			File dir = new File("F:\\openocd-0.10.0");
+			String path = DeepPlugin.getDefault().getPreferenceStore().getString(PreferenceConstants.DEFAULT_OPENOCD_PATH);
+			if (dbg) StdStreams.vrb.println("path: " + path);
+			File dir = new File(path);
 			try {
-				Runtime.getRuntime().exec("cmd /c start \"\" " + name, null, dir);
+				Runtime.getRuntime().exec("cmd /c start \"\" " + (path + "\\startOpenocdMicrozed.bat"), null, dir);
 				socket = new Socket(hostname, port);
 				socket.setSoTimeout(1000);
 				out = socket.getOutputStream();
@@ -98,46 +96,6 @@ public class OpenOCD extends TargetConnection {
 	@Override
 	public boolean isConnected() {
 		if (dbg) StdStreams.vrb.println("[TARGET] check for target connection");	
-
-//		/* check if openocd is running */
-//		boolean openOcdAvail = false;
-//		StdStreams.vrb.println("get process");
-//		Process p = null;
-//		try {
-//			p = Runtime.getRuntime().exec(System.getenv("windir")+"\\system32\\"+"tasklist.exe /v");
-//		} catch (IOException e) {
-//			// TODO Auto-generated catch block
-//			e.printStackTrace();
-//		}
-//		StdStreams.vrb.println("get input stream");
-//		BufferedReader input = new BufferedReader(new InputStreamReader(p.getInputStream()));
-//		
-//		StdStreams.vrb.println("add lines to pidInfo");
-//		String line;
-//		try {
-//			while ((line = input.readLine()) != null) {
-////				StdStreams.vrb.println(line);
-//				if (line.contains("openocd")) {
-//					if(line.contains("Running")) {
-//						openOcdAvail = true;
-//						StdStreams.vrb.println("found openocd, state running");
-//						break;
-//					} else {
-//						openOcdAvail = true;
-//						StdStreams.vrb.println("found openocd, not running");
-//					}
-//				}
-//			}
-//		} catch (IOException e) {
-//			// TODO Auto-generated catch block
-//			e.printStackTrace();
-//		}
-//		
-//		if (!openOcdAvail) {
-//			StdStreams.vrb.println("should start openocd");
-//		}
-//		
-////		input.close();
 		try {
 			if (socket == null || socket.getInputStream() == null) return false;
 			if (dbg) StdStreams.vrb.println("[TARGET] check returns " + (socket == null) + " " + socket.isConnected() + " " + socket.isClosed() + " " + socket.isOutputShutdown());	
@@ -346,7 +304,7 @@ public class OpenOCD extends TargetConnection {
 				String name = file.getKey();
 				name = name.replace('\\', '/');
 				StdStreams.log.println("Downloading " + name);
-				out.write((("load_image " + name + " " + file.getValue() + " \r\n").getBytes()));
+				out.write((("load_image \"" + name + "\" " + file.getValue() + " \r\n").getBytes()));
 				if (dbg) StdStreams.vrb.println("[TARGET] loading: " + name + " to addr 0x" + Integer.toHexString(file.getValue()));
 				buf = new StringBuffer();
 				while (true) {
@@ -367,7 +325,7 @@ public class OpenOCD extends TargetConnection {
 			if (file != null) {
 				while (in.available() > 0) in.read();	// empty buffer
 				StdStreams.log.print("Downloading bitstream " + file + " ");
-				out.write(("pld load 0 " + file + "\r\n").getBytes());
+				out.write(("pld load 0 \"" + file + "\"\r\n").getBytes());
 				socket.setSoTimeout(10000);
 				while (true) {
 					int n = in.available();
@@ -615,7 +573,6 @@ public class OpenOCD extends TargetConnection {
 			int n = in.available();
 			if (n <= 0) Thread.sleep(100);
 			int c = in.read();
-//			StdStreams.vrb.println((char)c);
 			if ((char)c == '\n') nofNL--;
 			if (c < 0) throw new TargetConnectionException("target not answering");
 			if (nofNL == 0) break;
