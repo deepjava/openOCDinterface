@@ -43,24 +43,29 @@ public class OpenOCD extends TargetConnection {
 	public void openConnection() throws TargetConnectionException {
 		if (dbg) StdStreams.vrb.println("[TARGET] Open connection");	
 		try {
-//			String currLoc = new File(".").getAbsolutePath();
-//			currLoc = currLoc.replace(currLoc.substring(currLoc.length()-1), "");
-//			currLoc += "\\startOpenocd-local.bat";
-//			String name = "F:\\openocd-0.10.0\\startOpenocdMicrozed.bat";
-////			StdStreams.vrb.println("run openocd: " + name);
-//			File dir = new File("F:\\openocd-0.10.0");
-//			Process p = Runtime.getRuntime().exec("cmd /c start \"\" " + name, null, dir);
-//			if (p != null) {
-//				if (dbg) StdStreams.vrb.println("OpenOCD process not null, " + p.toString());
-//			} else {
-//				if (dbg) StdStreams.vrb.println("OpenOCD process null");
-//			}
-			
 			socket = new Socket(hostname, port);
 			socket.setSoTimeout(1000);
 			out = socket.getOutputStream();
 			in = socket.getInputStream();
-			if (dbg) StdStreams.vrb.println("[TARGET] Connected ");
+		} catch (IOException e) {
+			if (dbg) StdStreams.vrb.println("[TARGET] no socket connection possible, start OpenOCD");
+			String currLoc = new File(".").getAbsolutePath();
+			currLoc = currLoc.replace(currLoc.substring(currLoc.length()-1), "");
+			currLoc += "\\startOpenocd-local.bat";
+			String name = "F:\\openocd-0.10.0\\startOpenocdMicrozed.bat";
+			if (dbg) StdStreams.log.println("run openocd: " + name);
+			File dir = new File("F:\\openocd-0.10.0");
+			try {
+				Runtime.getRuntime().exec("cmd /c start \"\" " + name, null, dir);
+				socket = new Socket(hostname, port);
+				socket.setSoTimeout(1000);
+				out = socket.getOutputStream();
+				in = socket.getInputStream();
+				if (dbg) StdStreams.vrb.println("[TARGET] started");
+			} catch (IOException e1) {
+				if (dbg) StdStreams.vrb.println("[TARGET] Cannot start OpenOCD server");
+				throw new TargetConnectionException(e1.getMessage(), e1);
+			}
 		} catch (Exception e) {
 			if (dbg) StdStreams.vrb.println("[TARGET] Connection failed on " + hostname);
 			throw new TargetConnectionException(e.getMessage(), e);
@@ -142,8 +147,6 @@ public class OpenOCD extends TargetConnection {
 				return false;
 			}
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
-//			e.printStackTrace();
 			return false;
 		}
 		return (socket.isConnected() && !socket.isClosed());
