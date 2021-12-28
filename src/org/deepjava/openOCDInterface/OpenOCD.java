@@ -50,11 +50,22 @@ public class OpenOCD extends TargetConnection {
 			in = socket.getInputStream();
 		} catch (IOException e) {
 			if (dbg) StdStreams.vrb.println("[TARGET] no socket connection possible, start OpenOCD");
-			String path = DeepPlugin.getDefault().getPreferenceStore().getString(PreferenceConstants.DEFAULT_OPENOCD_PATH);
-			if (dbg) StdStreams.vrb.println("path: " + path);
-			File dir = new File(path);
+			String cmd = DeepPlugin.getDefault().getPreferenceStore().getString(PreferenceConstants.DEFAULT_OPENOCD_CMD);
+			String opt = DeepPlugin.getDefault().getPreferenceStore().getString(PreferenceConstants.DEFAULT_OPENOCD_OPTIONS);
+			if (dbg) StdStreams.vrb.println("cmd: " + cmd);
+			if (dbg) StdStreams.vrb.println("options: " + opt);
 			try {
-				Runtime.getRuntime().exec("cmd /c start \"\" " + (path + "\\startOpenocdMicrozed.bat"), null, dir);
+				if (System.getProperty("os.name").toLowerCase().indexOf("windows") >= 0) { // is windows system
+					String path = cmd.substring(0, cmd.lastIndexOf("bin-x64"));
+					File dir = new File(path);
+					if (dbg) StdStreams.vrb.println("cmd /c start \"\" \"" + cmd + "\" " + opt);
+					Runtime.getRuntime().exec("cmd /c start \"\" \"" + cmd + "\" " + opt, null, dir);
+				} else if (System.getProperty("os.name").toLowerCase().indexOf("linux") >= 0) { // is linux system
+					String path = cmd.substring(0, cmd.lastIndexOf("openocd"));
+					File dir = new File(path);
+					if (dbg) StdStreams.vrb.println(cmd + opt);
+					Runtime.getRuntime().exec(cmd + opt, null, dir);
+				}
 				socket = new Socket(hostname, port);
 				socket.setSoTimeout(1000);
 				out = socket.getOutputStream();
