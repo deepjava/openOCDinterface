@@ -1,6 +1,8 @@
 package org.deepjava.openOCDInterface;
 
+import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.net.SocketAddress;
 import java.util.ArrayList;
 import java.util.Map;
 
@@ -52,28 +54,45 @@ public class OpenOCD extends TargetConnection {
 			if (dbg) StdStreams.vrb.println("[TARGET] no socket connection possible, start OpenOCD");
 			String cmd = DeepPlugin.getDefault().getPreferenceStore().getString(PreferenceConstants.DEFAULT_OPENOCD_CMD);
 			String opt = DeepPlugin.getDefault().getPreferenceStore().getString(PreferenceConstants.DEFAULT_OPENOCD_OPTIONS);
-			if (dbg) StdStreams.vrb.println("cmd: " + cmd);
-			if (dbg) StdStreams.vrb.println("options: " + opt);
+			if (dbg) StdStreams.vrb.println("[TARGET] cmd: " + cmd);
+			if (dbg) StdStreams.vrb.println("[TARGET] options: " + opt);
 			try {
 				if (System.getProperty("os.name").toLowerCase().indexOf("windows") >= 0) { // is windows system
 					String path = cmd.substring(0, cmd.lastIndexOf("bin-x64"));
 					File dir = new File(path);
-					if (dbg) StdStreams.vrb.println("cmd /c start \"\" \"" + cmd + "\" " + opt);
+					if (dbg) StdStreams.vrb.println("[TARGET] cmd /c start \"\" \"" + cmd + "\" " + opt);
 					Runtime.getRuntime().exec("cmd /c start \"\" \"" + cmd + "\" " + opt, null, dir);
 				} else if (System.getProperty("os.name").toLowerCase().indexOf("linux") >= 0) { // is linux system
 					String path = cmd.substring(0, cmd.lastIndexOf("openocd"));
 					File dir = new File(path);
-					if (dbg) StdStreams.vrb.println(cmd + opt);
+					if (dbg) StdStreams.vrb.println("[TARGET] " + cmd + opt);
 					Runtime.getRuntime().exec(cmd + opt, null, dir);
 				}
-				socket = new Socket(hostname, port);
+				socket = new Socket();
+				SocketAddress addr = new InetSocketAddress(hostname, port);
+				socket.connect(addr, 10000);
 				socket.setSoTimeout(1000);
 				out = socket.getOutputStream();
 				in = socket.getInputStream();
-				if (dbg) StdStreams.vrb.println("[TARGET] started");
+				if (dbg) StdStreams.vrb.println("[TARGET] connected");
+				try {
+					StringBuffer sb = new StringBuffer();
+					out.write(("reset halt\r\n").getBytes());		// check if target present
+					while (true) {
+						int c = in.read();
+						sb.append((char)c);
+						if (sb.indexOf("not examined yet") >= 0) {
+							if (dbg) StdStreams.vrb.println("[TARGET] Target not answering");
+							throw new TargetConnectionException("Target not answering");	
+						}
+						if (sb.indexOf("disabled") >= 0) return;	
+					}
+				} catch (Exception e1) {
+					throw new TargetConnectionException(e1.getMessage(), e1);
+				}
 			} catch (IOException e1) {
-				if (dbg) StdStreams.vrb.println("[TARGET] Cannot start OpenOCD server");
-				throw new TargetConnectionException(e1.getMessage(), e1);
+				if (dbg) StdStreams.vrb.println("[TARGET] Cannot connect to OpenOCD server");
+				throw new TargetConnectionException("Cannot connect to OpenOCD server", e1);
 			}
 		} catch (Exception e) {
 			if (dbg) StdStreams.vrb.println("[TARGET] Connection failed on " + hostname);
@@ -97,7 +116,10 @@ public class OpenOCD extends TargetConnection {
 	@Override
 	public void closeConnection() {
 		try {
-			if (socket != null) socket.close();
+			if (socket != null) {
+				out.write(("shutdown\r\n").getBytes());
+				socket.close();
+			}
 		} catch (IOException e) {
 			// do nothing
 		}
@@ -110,9 +132,17 @@ public class OpenOCD extends TargetConnection {
 		try {
 			if (socket == null || socket.getInputStream() == null) return false;
 			if (dbg) StdStreams.vrb.println("[TARGET] check returns " + (socket == null) + " " + socket.isConnected() + " " + socket.isClosed() + " " + socket.isOutputShutdown());	
-			int nof = socket.getInputStream().read();
-			if (dbg) StdStreams.vrb.println("[TARGET] read returns " + nof);
-			if ( nof == -1) {
+			int ch = socket.getInputStream().read();
+			if (dbg) StdStreams.vrb.println("[TARGET] read returns " + ch);
+			if (dbg) StdStreams.vrb.println("[TARGET] available " + socket.getInputStream().available());
+			if (socket.getInputStream().available() >= 100) {
+				out.write(("shutdown\r\n").getBytes());
+				if (dbg) StdStreams.vrb.println("[TARGET] shutdown server");
+				long time = System.currentTimeMillis();
+				while (System.currentTimeMillis() - time < 1000);	// wait for shutdown
+				return false;
+			}
+			if (ch == -1) {
 				return false;
 			}
 		} catch (IOException e) {
@@ -126,7 +156,7 @@ public class OpenOCD extends TargetConnection {
 		int timeout = 5;		// in sleep cycles of 100ms
 		try {
 			in.skip(in.available());
-			out.write(("wait_halt 10 \r\n").getBytes());		// try to read register to check if system is halted
+			out.write(("wait_halt 10 \r\n").getBytes());		// check if system is halted
 			int count = 0;
 			while (true) {
 				int n = in.available();
