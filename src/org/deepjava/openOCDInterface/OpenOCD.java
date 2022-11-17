@@ -70,6 +70,12 @@ public class OpenOCD extends TargetConnection {
 				}
 				socket = new Socket();
 				SocketAddress addr = new InetSocketAddress(hostname, port);
+				try {
+					Thread.currentThread().sleep(3000);
+				} catch (InterruptedException e2) {
+					// TODO Auto-generated catch block
+					e2.printStackTrace();
+				}
 				socket.connect(addr, 10000);
 				socket.setSoTimeout(1000);
 				out = socket.getOutputStream();
@@ -135,7 +141,13 @@ public class OpenOCD extends TargetConnection {
 			int ch = socket.getInputStream().read();
 			if (dbg) StdStreams.vrb.println("[TARGET] read returns " + ch);
 			if (dbg) StdStreams.vrb.println("[TARGET] available " + socket.getInputStream().available());
-			if (socket.getInputStream().available() >= 100) {
+			// if no target is connected, the server outputs lots of error messages
+			// the limit must be chosen to be bigger that what the server delivers after writing to memory or registers
+			// the answers to reading from memory or registers is consumed by the reading itself, therefore this is never critical 
+			if (socket.getInputStream().available() >= 500) {
+				if (dbg) {
+					while (in.available() > 0) StdStreams.vrb.print((char)in.read());
+				}
 				out.write(("shutdown\r\n").getBytes());
 				if (dbg) StdStreams.vrb.println("[TARGET] shutdown server");
 				long time = System.currentTimeMillis();
@@ -362,11 +374,12 @@ public class OpenOCD extends TargetConnection {
 			}
 
 			/* init PL */
-			String file = Configuration.getPlFile();
-			if (file != null) {
+			HString fname = Configuration.getPlFileName();
+			if (fname != null) {
+				String name = new File(fname.toString()).getCanonicalPath().replace('\\', '/');
 				while (in.available() > 0) in.read();	// empty buffer
-				StdStreams.log.print("Downloading bitstream " + file + " ");
-				out.write(("pld load 0 \"" + file + "\"\r\n").getBytes());
+				StdStreams.log.print("Downloading bitstream " + name + " ");
+				out.write(("pld load 0 \"" + name + "\"\r\n").getBytes());
 				socket.setSoTimeout(10000);
 				while (true) {
 					int n = in.available();
@@ -585,24 +598,25 @@ public class OpenOCD extends TargetConnection {
 		setRegisterValue("R1", r0Stored);
 	}
 
-	private int getMemLocation(byte[] cmd, int nofDigits) throws TargetConnectionException {
+	private int getMemLocation(byte[] cmd, int nofBytes) throws TargetConnectionException {
 		byte[] value = new byte[9];
 		int c, j = 0, val = 0, start = 999, xPosition = 999;
+		if (dbg) StdStreams.vrb.println("[TARGET] reading from memory");
 		try {
 			in.skip(in.available());
 			out.write(cmd);
 			while ((c = in.read()) != -1) {
-				if (c < 0) throw new TargetConnectionException("target not answering");
+				if (c < 0) throw new TargetConnectionException("[TARGET] target not answering");
 				if ((char)c == 'x') xPosition = j;
 				if (j == xPosition + 9) {
 					if ((char)c == ':') start = j + 2;
 					else xPosition = 999;
 				}				
 				if (j >= start) value[j - start ] = (byte) c;
-				if (j == start + nofDigits - 1) {val = parseHex(value, nofDigits); break;}
+				if (j == start + nofBytes - 1) {val = parseHex(value, nofBytes); break;}
 				j++;
 			}
-			if (dbg) StdStreams.vrb.println();		
+			if (dbg) StdStreams.vrb.println("[TARGET] " + val);		
 		} catch (Exception e) {
 			throw new TargetConnectionException(e.getMessage(), e);
 		}
