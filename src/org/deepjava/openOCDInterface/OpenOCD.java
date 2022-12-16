@@ -66,7 +66,7 @@ public class OpenOCD extends TargetConnection {
 					String path = cmd.substring(0, cmd.lastIndexOf("openocd"));
 					File dir = new File(path);
 					if (dbg) StdStreams.vrb.println("[TARGET] " + cmd + opt);
-					Runtime.getRuntime().exec(cmd + opt, null, dir);
+					Runtime.getRuntime().exec(cmd + ' ' + opt, null, dir);
 				}
 				socket = new Socket();
 				SocketAddress addr = new InetSocketAddress(hostname, port);
