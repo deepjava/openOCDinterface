@@ -2,9 +2,9 @@ Manifest-Version: 1.0
 Bundle-ManifestVersion: 2
 Bundle-Name: OpenOCD  telnet interface
 Bundle-SymbolicName: org.deepjava.openOCDInterface
-Bundle-Version: 1.2.0
+Bundle-Version: 1.2.1
 Bundle-Vendor: https://www.ost.ch/en/research-and-consulting-services/technology/system-technology/inf/
 Bundle-RequiredExecutionEnvironment: JavaSE-11
-Require-Bundle: org.deepjava.compiler;bundle-version="2.0.0",
+Require-Bundle: org.deepjava.compiler;bundle-version="2.2.1",
  org.eclipse.ui;bundle-version="3.114.0"
 Export-Package: org.deepjava.openOCDInterface
